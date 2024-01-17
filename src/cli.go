@@ -1,7 +1,6 @@
 package src
 
 import (
-	//"flag"
 	"flag"
 	"fmt"
 	"log"
@@ -58,7 +57,7 @@ func extractUrls(markdown []byte) []string {
 }
 
 type urlState struct {
-	url       string
+	url        string
 	statusCode int
 	errMsg     string
 }
@@ -68,10 +67,6 @@ func checkUrl(url string) urlState {
 
 	if err != nil {
 		return urlState{url: url, statusCode: 0, errMsg: err.Error()}
-	}
-
-	if resp.StatusCode >= 400 && resp.StatusCode <= 599 {
-		return urlState{url: url, statusCode: resp.StatusCode, errMsg: err.Error()}
 	}
 
 	return urlState{url: url, statusCode: resp.StatusCode, errMsg: ""}
