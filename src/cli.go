@@ -16,12 +16,17 @@ import (
 )
 
 func readFile(filepath string) ([]byte, error) {
-	// Read markdown file from filepath
-	markdown, err := os.ReadFile(filepath)
+	// Read file file from filepath
+	file, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	return markdown, nil
+
+	// Refuse if it's not a markdown file
+	if !strings.HasSuffix(filepath, ".md") {
+		return nil, fmt.Errorf("file is not a markdown file")
+	}
+	return file, nil
 }
 
 func extractUrls(markdown []byte) []string {
@@ -41,7 +46,7 @@ func extractUrls(markdown []byte) []string {
 	}
 
 	// Traverse the AST to find link and image nodes
-	ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+	err := ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
 			switch n := node.(type) {
 			case *ast.Link:
@@ -52,6 +57,10 @@ func extractUrls(markdown []byte) []string {
 		}
 		return ast.WalkContinue, nil
 	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return links
 }
@@ -100,6 +109,20 @@ func printUrlState(w *tabwriter.Writer, urlStates []urlState) {
 	}
 }
 
+func orchestrate(filepath *string, w *tabwriter.Writer) {
+	// Read markdown file from filepath
+	markdown, err := readFile(*filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	urls := extractUrls(markdown)
+	wg := &sync.WaitGroup{}
+	urlStates := checkUrls(wg, urls)
+
+	printUrlState(w, urlStates)
+}
+
 func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 	// Flush the writer at the end of the function
 	defer w.Flush()
@@ -142,17 +165,9 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 		return
 	}
 
+	// CLI options
 	if *filepath != "" {
-		// Read markdown file from filepath
-		markdown, err := readFile(*filepath)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		urls := extractUrls(markdown)
-		wg := &sync.WaitGroup{}
-		urlStates := checkUrls(wg, urls)
-
-		printUrlState(w, urlStates)
+		orchestrate(filepath, w)
+		return
 	}
 }

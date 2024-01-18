@@ -1,3 +1,13 @@
+SHELL := /bin/bash
+
+.PHONY: init
+init:
+	@echo "Initializing project"
+	@go mod download
+	@go mod tidy
+	@cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -t -I{} go install {}
+
+
 .PHONY: lint
 lint:
 	@echo "Running lint"
@@ -22,11 +32,3 @@ clean:
 	@echo "Cleaning up"
 	@go clean
 	@rm -rf ./bin
-
-
-.PHONY: init
-init:
-	@echo "Initializing project"
-	@go mod download
-	@go mod tidy
-	@go test -v ./...
