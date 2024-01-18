@@ -96,8 +96,15 @@ func checkUrls(wg *sync.WaitGroup, urls []string) []urlState {
 }
 
 func printHeader(w *tabwriter.Writer) {
-	fmt.Fprintf(w, "Link patrol\n")
-	fmt.Fprintf(w, "===========\n\n")
+	fmt.Fprintf(w, "\n\nLink patrol\n===========\n\n")
+}
+
+func printFilepath(w *tabwriter.Writer, filepath string) {
+	charLen := min(len(filepath), 70)
+	char := strings.Repeat("-", charLen)
+
+	fmt.Fprintf(w, "%s\n", filepath)
+	fmt.Fprintf(w, "%s\n\n", char)
 }
 
 func printUrlState(w *tabwriter.Writer, urlStates []urlState) {
@@ -167,6 +174,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 
 	// CLI options
 	if *filepath != "" {
+		printFilepath(w, *filepath)
 		orchestrate(filepath, w)
 		return
 	}

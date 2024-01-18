@@ -210,7 +210,7 @@ func TestCheckUrls(t *testing.T) {
 
 // Test for printHeader function
 func TestPrintHeader(t *testing.T) {
-	expectedOutput := "Link patrol\n===========\n\n"
+	expectedOutput := "\n\nLink patrol\n===========\n\n"
 
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
@@ -219,6 +219,20 @@ func TestPrintHeader(t *testing.T) {
 
 	if buf.String() != expectedOutput {
 		t.Errorf("printHeader() = %q, want %q", buf.String(), expectedOutput)
+	}
+}
+
+// Test for printFilepath function
+func TestPrintFilepath(t *testing.T) {
+	expectedOutput := "/tmp/testfile.md\n----------------\n\n"
+
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
+	printFilepath(w, "/tmp/testfile.md")
+	w.Flush()
+
+	if buf.String() != expectedOutput {
+		t.Errorf("printFilepath() = %q, want %q", buf.String(), expectedOutput)
 	}
 }
 
