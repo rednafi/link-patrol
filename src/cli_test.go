@@ -102,7 +102,7 @@ func TestCheckUrl_Success(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	state := checkUrl(ts.URL, 1 * time.Second)
+	state := checkUrl(ts.URL, 1*time.Second)
 
 	if state.StatusCode != http.StatusOK || state.ErrMsg != "" {
 		t.Errorf("Expected status 200 with no error, got status %d with error '%s'", state.StatusCode, state.ErrMsg)
@@ -117,7 +117,7 @@ func TestCheckUrl_ClientError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	state := checkUrl(ts.URL, 1 * time.Second)
+	state := checkUrl(ts.URL, 1*time.Second)
 
 	if state.StatusCode != http.StatusNotFound || state.ErrMsg != "" {
 		t.Errorf("Expected status 404 with no error, got status %d with error '%s'", state.StatusCode, state.ErrMsg)
@@ -132,7 +132,7 @@ func TestCheckUrl_ServerError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	state := checkUrl(ts.URL, 1 * time.Second)
+	state := checkUrl(ts.URL, 1*time.Second)
 
 	if state.StatusCode != http.StatusInternalServerError || state.ErrMsg != "" {
 		t.Errorf("Expected status 500 with no error, got status %d with error '%s'", state.StatusCode, state.ErrMsg)
@@ -142,7 +142,7 @@ func TestCheckUrl_ServerError(t *testing.T) {
 // TestCheckUrl_ConnectionError tests the checkUrl function with a connection error
 func TestCheckUrl_ConnectionError(t *testing.T) {
 	t.Parallel()
-	state := checkUrl("http://localhost:12345", 1 * time.Second)
+	state := checkUrl("http://localhost:12345", 1*time.Second)
 
 	if state.ErrMsg == "" {
 		t.Errorf("Expected a connection error, got no error")
@@ -152,7 +152,7 @@ func TestCheckUrl_ConnectionError(t *testing.T) {
 // TestCheckUrl_InvalidUrl tests the checkUrl function with an invalid URL format
 func TestCheckUrl_InvalidUrl(t *testing.T) {
 	t.Parallel()
-	state := checkUrl(":%", 1 * time.Second)
+	state := checkUrl(":%", 1*time.Second)
 
 	if state.ErrMsg == "" {
 		t.Errorf("Expected an invalid URL error, got no error")
@@ -188,7 +188,7 @@ func TestCheckUrls(t *testing.T) {
 
 	// Call checkUrls
 	var wg sync.WaitGroup
-	urlStates := checkUrls(&wg, testUrls, 1 * time.Second)
+	urlStates := checkUrls(&wg, testUrls, 1*time.Second)
 
 	// Verify the results
 	if len(urlStates) != len(testUrls) {
@@ -233,7 +233,6 @@ func TestPrintHeader(t *testing.T) {
 	}
 }
 
-
 // Test for printUrlState function
 func TestPrintUrlState(t *testing.T) {
 	t.Parallel()
@@ -252,5 +251,35 @@ func TestPrintUrlState(t *testing.T) {
 
 	if actualOutput != expectedOutput {
 		t.Errorf("printUrlState() = %q, want %q", actualOutput, expectedOutput)
+	}
+}
+
+// Benchmark for checkUrls
+func BenchmarkCheckUrls(b *testing.B) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ok":
+			w.WriteHeader(http.StatusOK)
+		case "/notfound":
+			w.WriteHeader(http.StatusNotFound)
+		case "/error":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer ts.Close()
+
+	testUrls := []string{
+		ts.URL + "/ok",
+		ts.URL + "/notfound",
+		ts.URL + "/error",
+		"http://localhost:12345", // Connection error
+		":%",                     // Invalid URL
+	}
+
+	for i := 0; i < b.N; i++ {
+		var wg sync.WaitGroup
+		_ = checkUrls(&wg, testUrls, 1*time.Second)
 	}
 }

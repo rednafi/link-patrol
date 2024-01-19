@@ -27,6 +27,12 @@ test:
 	@go test -v ./...
 
 
+.PHONY: bench
+bench:
+	@echo "Running benchmarks"
+	@go test -bench=. -benchmem ./...
+
+
 .PHONY: clean
 clean:
 	@echo "Cleaning up"

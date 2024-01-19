@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -104,7 +104,6 @@ func checkUrl(url string, timeout time.Duration) UrlState {
 	return UrlState{Url: url, StatusCode: resp.StatusCode, ErrMsg: ""}
 }
 
-
 // Check the state of a list of URLs
 func checkUrls(wg *sync.WaitGroup, urls []string, timeout time.Duration) []UrlState {
 	var urlStates []UrlState
@@ -189,42 +188,46 @@ func orchestrate(w *tabwriter.Writer, filepath *string, timeout time.Duration) {
 
 // CLI
 func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
-    defer w.Flush()
+	defer w.Flush()
 
-    // Set up command line flags
-    fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-    fs.SetOutput(w)
+	// Set up command line flags
+	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	fs.SetOutput(w)
 
-    // Define CLI options with long and short flags
-    var filepath string
-    fs.StringVar(&filepath, "filepath", "", "Path to markdown file")
-    fs.StringVar(&filepath, "f", "", "Path to markdown file (short)")
+	// Define CLI options with long and short flags
+	var filepath string
+	var timeout time.Duration
+	var help bool
 
-    var timeout time.Duration
-    fs.DurationVar(&timeout, "timeout", 5*time.Second, "Timeout for HTTP requests")
-    fs.DurationVar(&timeout, "t", 5*time.Second, "Timeout for HTTP requests (short)")
-
-    var help bool
-    fs.BoolVar(&help, "help", false, "Print usage")
-    fs.BoolVar(&help, "h", false, "Print usage (short)")
+	fs.StringVar(&filepath, "f, filepath", "", "Path to markdown file [short: -f]")
+	fs.DurationVar(
+		&timeout, "t, timeout", 5*time.Second,
+		"Timeout for HTTP requests [default 5s, short: -t]",
+	)
+	fs.BoolVar(&help, "h, help", false, "Print usage information (short: -h)")
 
 	printHeader(w)
 
+	// Custom usage function
+	fs.Usage = func() {
+		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
+		fs.PrintDefaults()
+	}
 
-    // Parse flags and handle errors
-    if err := fs.Parse(os.Args[1:]); err != nil {
-        exitFunc(2)
-    }
+	// Parse flags and handle errors
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		exitFunc(2)
+	}
 
-    // Check for no arguments or help flag
-    if len(os.Args) < 2 || help {
-        fs.Usage()
-        return
-    }
+	// Check for no arguments or help flag
+	if len(os.Args) < 2 || help {
+		fs.Usage()
+		return
+	}
 
-    // Handle filepath option
-    if filepath != "" {
-        orchestrate(w, &filepath, timeout)
-        return
-    }
+	// Handle filepath option
+	if filepath != "" {
+		orchestrate(w, &filepath, timeout)
+		return
+	}
 }
