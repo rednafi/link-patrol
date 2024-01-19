@@ -191,7 +191,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 	defer w.Flush()
 
 	// Set up command line flags
-	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.SetOutput(w)
 
 	// Define CLI options with long and short flags
@@ -199,17 +199,18 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 	var timeout time.Duration
 	var help bool
 
-	fs.StringVar(&filepath, "f, filepath", "", "Path to markdown file [short: -f]")
-	fs.DurationVar(
-		&timeout, "t, timeout", 5*time.Second,
-		"Timeout for HTTP requests [default 5s, short: -t]",
+	fs.BoolVar(&help, "h, help", false, "Print usage information")
+	fs.StringVar(&filepath, "f, filepath", "", "Path to markdown file")
+	fs.DurationVar(&timeout, "t, timeout", 5*time.Second,
+		"Timeout for HTTP each request",
 	)
-	fs.BoolVar(&help, "h, help", false, "Print usage information (short: -h)")
 
+	// Print header
 	printHeader(w)
 
 	// Custom usage function
 	fs.Usage = func() {
+		defer w.Flush()
 		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
 		fs.PrintDefaults()
 	}
