@@ -235,23 +235,28 @@ func TestPrintHeader(t *testing.T) {
 
 // Test for printUrlState function
 func TestPrintUrlState(t *testing.T) {
-	t.Parallel()
-	urlStates := []UrlState{
-		{"http://example.com", 200, "OK"},
-		{"http://testsite.com", 404, "Not Found"},
-	}
+    t.Parallel()
+    urlStates := []UrlState{
+        {"http://example.com", 200, "OK"},
+        {"http://testsite.com", 404, "Not Found"},
+    }
 
-	var buf bytes.Buffer
-	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
-	printUrlState(w, urlStates)
-	w.Flush()
+    var buf bytes.Buffer
+    w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
+    printUrlState(w, urlStates)
+    w.Flush()
 
-	expectedOutput := "- URL        : http://example.com\n  Status Code: 200\n  Error      : OK\n\n- URL        : http://testsite.com\n  Status Code: 404\n  Error      : Not Found\n\n"
-	actualOutput := buf.String()
+    expectedOutput := "- URL        : http://example.com\n" +
+                      "  Status Code: 200\n" +
+                      "  Error      : OK\n\n" +
+                      "- URL        : http://testsite.com\n" +
+                      "  Status Code: 404\n" +
+                      "  Error      : Not Found\n\n"
+    actualOutput := buf.String()
 
-	if actualOutput != expectedOutput {
-		t.Errorf("printUrlState() = %q, want %q", actualOutput, expectedOutput)
-	}
+    if actualOutput != expectedOutput {
+        t.Errorf("printUrlState() = %q, want %q", actualOutput, expectedOutput)
+    }
 }
 
 // Benchmark for checkUrls
