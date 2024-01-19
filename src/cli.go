@@ -1,7 +1,6 @@
 package src
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -13,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/urfave/cli/v2"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
@@ -131,6 +131,12 @@ func printHeader(w *tabwriter.Writer) {
 	fmt.Fprintf(w, "\nLink patrol\n===========\n\n")
 }
 
+// Print the filepath
+func printFilepath(w *tabwriter.Writer, filepath string) {
+	defer w.Flush()
+	fmt.Fprintf(w, "Filepath: %s\n\n", filepath)
+}
+
 // Print the URL states
 func printUrlState(w *tabwriter.Writer, urlStates []UrlState) {
 	defer w.Flush()
@@ -170,10 +176,10 @@ func raiseErrorIfUrlStateHasErrorStatus(urlStates []UrlState) {
 }
 
 // Orchestrate the whole process
-func orchestrate(w *tabwriter.Writer, filepath *string, timeout time.Duration) {
+func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration) {
 	defer w.Flush()
 	// Read markdown file from filepath
-	markdown, err := readFile(*filepath)
+	markdown, err := readFile(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -188,47 +194,53 @@ func orchestrate(w *tabwriter.Writer, filepath *string, timeout time.Duration) {
 
 // CLI
 func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
-	defer w.Flush()
+	app := cli.NewApp()
+	app.Name = "Link patrol"
+	app.Usage = "Test the URLs in your markdown files"
+	app.Version = version
 
-	// Set up command line flags
-	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	fs.SetOutput(w)
+	// Custom Writer
+	app.Writer = w
+	app.ErrWriter = w
 
-	// Define CLI options with long and short flags
-	var filepath string
-	var timeout time.Duration
-	var help bool
+	// Global Flags
+	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:    "filepath",
+			Aliases: []string{"f"},
+			Usage:   "path to the markdown file",
+		},
+		&cli.DurationFlag{
+			Name:    "timeout",
+			Aliases: []string{"t"},
+			Value:   5 * time.Second,
+			Usage:   "timeout for each HTTP request",
+		},
+	}
 
-	fs.BoolVar(&help, "h, help", false, "Print usage information")
-	fs.StringVar(&filepath, "f, filepath", "", "Path to markdown file")
-	fs.DurationVar(&timeout, "t, timeout", 5*time.Second,
-		"Timeout for HTTP each request",
-	)
-
-	// Print header
-	printHeader(w)
-
-	// Custom usage function
-	fs.Usage = func() {
+	// Main Action
+	app.Action = func(c *cli.Context) error {
 		defer w.Flush()
-		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
-		fs.PrintDefaults()
+		printHeader(w) // Your printHeader function
+
+		filepath := c.String("filepath")
+		timeout := c.Duration("timeout")
+
+		if filepath == "" {
+			// Show help if no filepath is provided
+			_ = cli.ShowAppHelp(c)
+			return fmt.Errorf("filepath is required")
+		}
+
+		// Proceed with orchestration as filepath is provided
+		printFilepath(w, filepath)
+		orchestrate(w, filepath, timeout) // Your orchestrate function
+		return nil
 	}
 
-	// Parse flags and handle errors
-	if err := fs.Parse(os.Args[1:]); err != nil {
-		exitFunc(2)
-	}
-
-	// Check for no arguments or help flag
-	if len(os.Args) < 2 || help {
-		fs.Usage()
-		return
-	}
-
-	// Handle filepath option
-	if filepath != "" {
-		orchestrate(w, &filepath, timeout)
-		return
+	// Handle execution
+	err := app.Run(os.Args)
+	if err != nil {
+		exitFunc(2) // Your exitFunc function
 	}
 }
