@@ -8,10 +8,12 @@ import (
 	"sync"
 	"testing"
 	"text/tabwriter"
+	"time"
 )
 
 // TestReadFile tests the readFile function
 func TestReadFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := os.TempDir()
 	filepath := tmpDir + "/testfile.md"
 	expected := []byte("test content")
@@ -52,6 +54,7 @@ func TestReadFile(t *testing.T) {
 
 // TestReadFile_NonExistentFile tests the readFile function with a non-existent file
 func TestReadFile_NonExistentFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := os.TempDir()
 	filepath := tmpDir + "/non-existent-file.md"
 	_, err := readFile(filepath)
@@ -63,6 +66,7 @@ func TestReadFile_NonExistentFile(t *testing.T) {
 
 // TestReadFile_NonMarkdownFile tests the readFile function with a non-markdown file
 func TestReadFile_NonMarkdownFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := os.TempDir()
 	filepath := tmpDir + "/testfile.txt"
 
@@ -92,66 +96,72 @@ func TestReadFile_NonMarkdownFile(t *testing.T) {
 
 // TestCheckUrl_Success tests the checkUrl function with a successful HTTP request
 func TestCheckUrl_Success(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
 
-	state := checkUrl(ts.URL)
+	state := checkUrl(ts.URL, 1 * time.Second)
 
-	if state.statusCode != http.StatusOK || state.errMsg != "" {
-		t.Errorf("Expected status 200 with no error, got status %d with error '%s'", state.statusCode, state.errMsg)
+	if state.StatusCode != http.StatusOK || state.ErrMsg != "" {
+		t.Errorf("Expected status 200 with no error, got status %d with error '%s'", state.StatusCode, state.ErrMsg)
 	}
 }
 
 // TestCheckUrl_ClientError tests the checkUrl function with a client error
 func TestCheckUrl_ClientError(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer ts.Close()
 
-	state := checkUrl(ts.URL)
+	state := checkUrl(ts.URL, 1 * time.Second)
 
-	if state.statusCode != http.StatusNotFound || state.errMsg != "" {
-		t.Errorf("Expected status 404 with no error, got status %d with error '%s'", state.statusCode, state.errMsg)
+	if state.StatusCode != http.StatusNotFound || state.ErrMsg != "" {
+		t.Errorf("Expected status 404 with no error, got status %d with error '%s'", state.StatusCode, state.ErrMsg)
 	}
 }
 
 // TestCheckUrl_ServerError tests the checkUrl function with a server error
 func TestCheckUrl_ServerError(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer ts.Close()
 
-	state := checkUrl(ts.URL)
+	state := checkUrl(ts.URL, 1 * time.Second)
 
-	if state.statusCode != http.StatusInternalServerError || state.errMsg != "" {
-		t.Errorf("Expected status 500 with no error, got status %d with error '%s'", state.statusCode, state.errMsg)
+	if state.StatusCode != http.StatusInternalServerError || state.ErrMsg != "" {
+		t.Errorf("Expected status 500 with no error, got status %d with error '%s'", state.StatusCode, state.ErrMsg)
 	}
 }
 
 // TestCheckUrl_ConnectionError tests the checkUrl function with a connection error
 func TestCheckUrl_ConnectionError(t *testing.T) {
-	state := checkUrl("http://localhost:12345")
+	t.Parallel()
+	state := checkUrl("http://localhost:12345", 1 * time.Second)
 
-	if state.errMsg == "" {
+	if state.ErrMsg == "" {
 		t.Errorf("Expected a connection error, got no error")
 	}
 }
 
 // TestCheckUrl_InvalidUrl tests the checkUrl function with an invalid URL format
 func TestCheckUrl_InvalidUrl(t *testing.T) {
-	state := checkUrl(":%")
+	t.Parallel()
+	state := checkUrl(":%", 1 * time.Second)
 
-	if state.errMsg == "" {
+	if state.ErrMsg == "" {
 		t.Errorf("Expected an invalid URL error, got no error")
 	}
 }
 
 // TestCheckUrls tests the checkUrls function with various URL scenarios
 func TestCheckUrls(t *testing.T) {
+	t.Parallel()
 	// Create a test server that responds based on URL path
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -178,7 +188,7 @@ func TestCheckUrls(t *testing.T) {
 
 	// Call checkUrls
 	var wg sync.WaitGroup
-	urlStates := checkUrls(&wg, testUrls)
+	urlStates := checkUrls(&wg, testUrls, 1 * time.Second)
 
 	// Verify the results
 	if len(urlStates) != len(testUrls) {
@@ -189,7 +199,7 @@ func TestCheckUrls(t *testing.T) {
 	urlToStatus := make(map[string]int)
 
 	for _, state := range urlStates {
-		urlToStatus[state.url] = state.statusCode
+		urlToStatus[state.Url] = state.StatusCode
 	}
 
 	expectedUrlToStatus := map[string]int{
@@ -210,7 +220,8 @@ func TestCheckUrls(t *testing.T) {
 
 // Test for printHeader function
 func TestPrintHeader(t *testing.T) {
-	expectedOutput := "\n\nLink patrol\n===========\n\n"
+	t.Parallel()
+	expectedOutput := "\nLink patrol\n===========\n\n"
 
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
@@ -222,23 +233,11 @@ func TestPrintHeader(t *testing.T) {
 	}
 }
 
-// Test for printFilepath function
-func TestPrintFilepath(t *testing.T) {
-	expectedOutput := "/tmp/testfile.md\n----------------\n\n"
-
-	var buf bytes.Buffer
-	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
-	printFilepath(w, "/tmp/testfile.md")
-	w.Flush()
-
-	if buf.String() != expectedOutput {
-		t.Errorf("printFilepath() = %q, want %q", buf.String(), expectedOutput)
-	}
-}
 
 // Test for printUrlState function
 func TestPrintUrlState(t *testing.T) {
-	urlStates := []urlState{
+	t.Parallel()
+	urlStates := []UrlState{
 		{"http://example.com", 200, "OK"},
 		{"http://testsite.com", 404, "Not Found"},
 	}
@@ -248,7 +247,7 @@ func TestPrintUrlState(t *testing.T) {
 	printUrlState(w, urlStates)
 	w.Flush()
 
-	expectedOutput := "URL Status Code Error\n--- ----------- -----\n\nhttp://example.com  200 OK\nhttp://testsite.com 404 Not Found\n"
+	expectedOutput := "- URL        : http://example.com\n  Status Code: 200\n  Error      : OK\n\n- URL        : http://testsite.com\n  Status Code: 404\n  Error      : Not Found\n\n"
 	actualOutput := buf.String()
 
 	if actualOutput != expectedOutput {

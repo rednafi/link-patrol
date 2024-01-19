@@ -5,18 +5,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net"
 	"os"
 	"strings"
 	"sync"
 	"text/tabwriter"
+	"text/template"
+	"time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
 
+// Read markdown file from filepath
 func readFile(filepath string) ([]byte, error) {
-	// Read file file from filepath
 	file, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
@@ -29,6 +32,7 @@ func readFile(filepath string) ([]byte, error) {
 	return file, nil
 }
 
+// Extract URLs from markdown content
 func extractUrls(markdown []byte) []string {
 	var links []string
 
@@ -65,58 +69,110 @@ func extractUrls(markdown []byte) []string {
 	return links
 }
 
-type urlState struct {
-	url        string
-	statusCode int
-	errMsg     string
+// Check the state of a URL and save the result in a struct
+type UrlState struct {
+	Url        string
+	StatusCode int
+	ErrMsg     string
 }
 
-func checkUrl(url string) urlState {
-	resp, err := http.Get(url)
-
-	if err != nil {
-		return urlState{url: url, statusCode: 0, errMsg: err.Error()}
+// Check the state of a URL
+func checkUrl(url string, timeout time.Duration) UrlState {
+	client := &http.Client{
+		Timeout: timeout,
 	}
 
-	return urlState{url: url, statusCode: resp.StatusCode, errMsg: ""}
+	resp, err := client.Get(url)
+
+	if err != nil {
+		// Check if the error is a timeout
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			return UrlState{
+				Url:        url,
+				StatusCode: 0,
+				ErrMsg:     fmt.Sprintf("Request timed out after %s", timeout),
+			}
+		}
+		return UrlState{
+			Url:        url,
+			StatusCode: 0,
+			ErrMsg:     err.Error(),
+		}
+	}
+	defer resp.Body.Close()
+
+	return UrlState{Url: url, StatusCode: resp.StatusCode, ErrMsg: ""}
 }
 
-func checkUrls(wg *sync.WaitGroup, urls []string) []urlState {
-	var urlStates []urlState
+
+// Check the state of a list of URLs
+func checkUrls(wg *sync.WaitGroup, urls []string, timeout time.Duration) []UrlState {
+	var urlStates []UrlState
+	var mutex sync.Mutex
 
 	for _, url := range urls {
 		wg.Add(1)
 		go func(url string) {
-			urlStates = append(urlStates, checkUrl(url))
-			wg.Done()
+			defer wg.Done()
+			urlState := checkUrl(url, timeout)
+
+			mutex.Lock()
+			urlStates = append(urlStates, urlState)
+			mutex.Unlock()
 		}(url)
 	}
+
 	wg.Wait()
 	return urlStates
 }
 
+// Print a pretty header
 func printHeader(w *tabwriter.Writer) {
-	fmt.Fprintf(w, "\n\nLink patrol\n===========\n\n")
+	defer w.Flush()
+	fmt.Fprintf(w, "\nLink patrol\n===========\n\n")
 }
 
-func printFilepath(w *tabwriter.Writer, filepath string) {
-	charLen := min(len(filepath), 70)
-	char := strings.Repeat("-", charLen)
+// Print the URL states
+func printUrlState(w *tabwriter.Writer, urlStates []UrlState) {
+	defer w.Flush()
 
-	fmt.Fprintf(w, "%s\n", filepath)
-	fmt.Fprintf(w, "%s\n\n", char)
-}
+	const tpl = `- URL        : {{.Url}}
+  Status Code: {{if eq .StatusCode 0}}-{{else}}{{.StatusCode}}{{end}}
+  Error      : {{if .ErrMsg}}{{.ErrMsg}}{{else}}-{{end}}
 
-func printUrlState(w *tabwriter.Writer, urlStates []urlState) {
-	fmt.Fprintf(w, "URL\tStatus Code\tError\n")
-	fmt.Fprintf(w, "---\t-----------\t-----\n\n")
+`
+	t, err := template.New("UrlState").Parse(tpl)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	for _, urlState := range urlStates {
-		fmt.Fprintf(w, "%s\t%d\t%s\n", urlState.url, urlState.statusCode, urlState.errMsg)
+		err := t.Execute(w, urlState)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 	}
 }
 
-func orchestrate(filepath *string, w *tabwriter.Writer) {
+func raiseErrorIfUrlStateHasErrorStatus(urlStates []UrlState) {
+	statusCodeMap := make(map[int]struct{})
+	for _, urlState := range urlStates {
+		statusCodeMap[urlState.StatusCode] = struct{}{}
+	}
+
+	for code := 400; code <= 599; code++ {
+		if _, exists := statusCodeMap[code]; exists {
+			log.Fatal("Some URLs are invalid or unreachable")
+			break
+		}
+	}
+}
+
+// Orchestrate the whole process
+func orchestrate(w *tabwriter.Writer, filepath *string, timeout time.Duration) {
+	defer w.Flush()
 	// Read markdown file from filepath
 	markdown, err := readFile(*filepath)
 	if err != nil {
@@ -125,57 +181,50 @@ func orchestrate(filepath *string, w *tabwriter.Writer) {
 
 	urls := extractUrls(markdown)
 	wg := &sync.WaitGroup{}
-	urlStates := checkUrls(wg, urls)
+	urlStates := checkUrls(wg, urls, timeout)
 
 	printUrlState(w, urlStates)
+	raiseErrorIfUrlStateHasErrorStatus(urlStates)
 }
 
+// CLI
 func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
-	// Flush the writer at the end of the function
-	defer w.Flush()
+    defer w.Flush()
 
-	fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	flag.CommandLine = fs
+    // Set up command line flags
+    fs := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+    fs.SetOutput(w)
 
-	// Set the default output to the passed tabwriter
-	fs.SetOutput(w)
+    // Define CLI options with long and short flags
+    var filepath string
+    fs.StringVar(&filepath, "filepath", "", "Path to markdown file")
+    fs.StringVar(&filepath, "f", "", "Path to markdown file (short)")
 
-	// Define the flags
-	filepath := flag.String("filepath", "", "Path to markdown file")
-	flag.StringVar(filepath, "f", "", "Path to markdown file")
+    var timeout time.Duration
+    fs.DurationVar(&timeout, "timeout", 5*time.Second, "Timeout for HTTP requests")
+    fs.DurationVar(&timeout, "t", 5*time.Second, "Timeout for HTTP requests (short)")
 
-	help := flag.Bool("help", false, "Print usage")
-	flag.BoolVar(help, "h", false, "Print usage")
-
-	flag.Usage = func() {
-		fmt.Fprintf(w, "Usage of %s:\n", os.Args[0])
-		fmt.Fprint(w, `  -f, --filepath [filepath]
-		Path to markdown file
-  -h, --help
-		Print usage`)
-	}
+    var help bool
+    fs.BoolVar(&help, "help", false, "Print usage")
+    fs.BoolVar(&help, "h", false, "Print usage (short)")
 
 	printHeader(w)
-	flagUsageOld := flag.Usage
-	fs.Usage = func() {
-		flagUsageOld()
-		w.Flush()
-	}
 
-	err := fs.Parse(os.Args[1:])
-	if err != nil {
-		exitFunc(2)
-	}
 
-	if len(os.Args) < 2 || *help {
-		flag.Usage()
-		return
-	}
+    // Parse flags and handle errors
+    if err := fs.Parse(os.Args[1:]); err != nil {
+        exitFunc(2)
+    }
 
-	// CLI options
-	if *filepath != "" {
-		printFilepath(w, *filepath)
-		orchestrate(filepath, w)
-		return
-	}
+    // Check for no arguments or help flag
+    if len(os.Args) < 2 || help {
+        fs.Usage()
+        return
+    }
+
+    // Handle filepath option
+    if filepath != "" {
+        orchestrate(w, &filepath, timeout)
+        return
+    }
 }
