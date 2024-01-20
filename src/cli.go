@@ -19,7 +19,7 @@ import (
 )
 
 // Read markdown file from filepath
-func readFile(filepath string) ([]byte, error) {
+func readMarkdown(filepath string) ([]byte, error) {
 	file, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func readFile(filepath string) ([]byte, error) {
 }
 
 // Extract URLs from markdown content
-func extractUrls(markdown []byte) []string {
+func findLinks(markdown []byte) []string {
 	var links []string
 
 	// Parse the markdown content
@@ -61,7 +61,6 @@ func extractUrls(markdown []byte) []string {
 		}
 		return ast.WalkContinue, nil
 	})
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,59 +69,37 @@ func extractUrls(markdown []byte) []string {
 }
 
 // Check the state of a URL and save the result in a struct
-type UrlState struct {
-	Url        string
+type linkRecord struct {
+	URL        string
 	StatusCode int
 	ErrMsg     string
 }
 
 // Check the state of a URL
-func checkUrl(url string, timeout time.Duration) UrlState {
+func checkLink(url string, timeout time.Duration) linkRecord {
 	client := &http.Client{
 		Timeout: timeout,
 	}
 
 	resp, err := client.Get(url)
-
 	if err != nil {
 		// Check if the error is a timeout
 		if err, ok := err.(net.Error); ok && err.Timeout() {
-			return UrlState{
-				Url:        url,
+			return linkRecord{
+				URL:        url,
 				StatusCode: 0,
 				ErrMsg:     fmt.Sprintf("Request timed out after %s", timeout),
 			}
 		}
-		return UrlState{
-			Url:        url,
+		return linkRecord{
+			URL:        url,
 			StatusCode: 0,
 			ErrMsg:     err.Error(),
 		}
 	}
 	defer resp.Body.Close()
 
-	return UrlState{Url: url, StatusCode: resp.StatusCode, ErrMsg: ""}
-}
-
-// Check the state of a list of URLs
-func checkUrls(wg *sync.WaitGroup, urls []string, timeout time.Duration) []UrlState {
-	var urlStates []UrlState
-	var mutex sync.Mutex
-
-	for _, url := range urls {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			urlState := checkUrl(url, timeout)
-
-			mutex.Lock()
-			urlStates = append(urlStates, urlState)
-			mutex.Unlock()
-		}(url)
-	}
-
-	wg.Wait()
-	return urlStates
+	return linkRecord{URL: url, StatusCode: resp.StatusCode, ErrMsg: ""}
 }
 
 // Print a pretty header
@@ -138,66 +115,92 @@ func printFilepath(w *tabwriter.Writer, filepath string) {
 }
 
 // Print the URL states
-func printUrlState(w *tabwriter.Writer, urlStates []UrlState) {
+func printLinkRecord(w *tabwriter.Writer, linkRecord linkRecord) {
 	defer w.Flush()
 
-	const tpl = `- URL        : {{.Url}}
+	const tpl = `- URL        : {{.URL}}
   Status Code: {{if eq .StatusCode 0}}-{{else}}{{.StatusCode}}{{end}}
   Error      : {{if .ErrMsg}}{{.ErrMsg}}{{else}}-{{end}}
 
 `
-	t, err := template.New("UrlState").Parse(tpl)
+	t, err := template.New("linkRecord").Parse(tpl)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
-	for _, urlState := range urlStates {
-		err := t.Execute(w, urlState)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
+	err = t.Execute(w, linkRecord)
+	if err != nil {
+		log.Fatal(err)
+		return
 	}
 }
 
-func raiseErrorIfUrlStateHasErrorStatus(urlStates []UrlState) {
-	statusCodeMap := make(map[int]struct{})
-	for _, urlState := range urlStates {
-		statusCodeMap[urlState.StatusCode] = struct{}{}
-	}
+// Check the state of a list of URLs
+func checkLinks(w *tabwriter.Writer, urls []string, timeout time.Duration, errOk bool) {
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
+	var hasError bool
 
-	for code := 400; code <= 599; code++ {
-		if _, exists := statusCodeMap[code]; exists {
-			log.Fatal("Some URLs are invalid or unreachable")
-			break
-		}
+	for _, url := range urls {
+		wg.Add(1)
+		go func(url string) {
+			urlState := checkLink(url, timeout)
+
+			// Print the URL state
+			mutex.Lock()
+			printLinkRecord(w, urlState)
+
+			// Raise error if the URL state has an error status code
+			if urlState.StatusCode >= 400 {
+				hasError = true
+			}
+
+			mutex.Unlock()
+			wg.Done()
+		}(url)
+	}
+	wg.Wait()
+
+	if hasError && !errOk {
+		log.Fatal("Some URLs are invalid or unreachable")
 	}
 }
 
 // Orchestrate the whole process
-func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration) {
+func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, errOk bool) {
 	defer w.Flush()
 	// Read markdown file from filepath
-	markdown, err := readFile(filepath)
+	markdown, err := readMarkdown(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	urls := extractUrls(markdown)
-	wg := &sync.WaitGroup{}
-	urlStates := checkUrls(wg, urls, timeout)
-
-	printUrlState(w, urlStates)
-	raiseErrorIfUrlStateHasErrorStatus(urlStates)
+	urls := findLinks(markdown)
+	checkLinks(w, urls, timeout, errOk)
 }
 
 // CLI
 func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 	app := cli.NewApp()
 	app.Name = "Link patrol"
-	app.Usage = "Test the URLs in your markdown files"
+	app.Usage = "detect dead links in markdown files"
 	app.Version = version
+	app.UsageText = "link-patrol [global options] command [command options]"
+	app.HelpName = "Link patrol"
+	app.Suggest = true
+	app.EnableBashCompletion = true
+	app.Authors = []*cli.Author{
+		{
+			Name:  "Redowan Delowar",
+			Email: "",
+		},
+	}
+	app.Before = func(c *cli.Context) error {
+		printHeader(w)
+		return nil
+	}
+
 
 	// Custom Writer
 	app.Writer = w
@@ -216,15 +219,21 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 			Value:   5 * time.Second,
 			Usage:   "timeout for each HTTP request",
 		},
+		&cli.BoolFlag{
+			Name:    "error-ok",
+			Aliases: []string{"e"},
+			Value:   false,
+			Usage:   "always exit with code 0",
+		},
 	}
 
 	// Main Action
 	app.Action = func(c *cli.Context) error {
 		defer w.Flush()
-		printHeader(w) // Your printHeader function
-
+		
 		filepath := c.String("filepath")
 		timeout := c.Duration("timeout")
+		errOk := c.Bool("error-ok")
 
 		if filepath == "" {
 			// Show help if no filepath is provided
@@ -234,7 +243,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 
 		// Proceed with orchestration as filepath is provided
 		printFilepath(w, filepath)
-		orchestrate(w, filepath, timeout) // Your orchestrate function
+		orchestrate(w, filepath, timeout, errOk) // Your orchestrate function
 		return nil
 	}
 

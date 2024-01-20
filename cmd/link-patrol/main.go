@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/rednafi/link-patrol/src"
 	"os"
 	"text/tabwriter"
+
+	"github.com/rednafi/link-patrol/src"
 )
 
 // Ldflags filled by goreleaser
-var version string
+var version string = "sentinel"
 
 func main() {
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)

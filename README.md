@@ -2,66 +2,85 @@
 
 ## Usage
 
+* Inspect the help section:
 
-```sh
-link-petrol -h
-```
+   ```sh
+   link-petrol -h
+   ```
 
-```
-NAME:
-   Link patrol - Test the URLs in your markdown files
+   ```
+   NAME:
+      Link patrol - detect dead links in markdown files
 
-USAGE:
-   Link patrol [global options] command [command options]
+   USAGE:
+      link-patrol [global options] command [command options]
 
-COMMANDS:
-   help, h  Shows a list of commands or help for one command
+   VERSION:
+      sentinel
 
-GLOBAL OPTIONS:
-   --filepath value, -f value  path to the markdown file
-   --timeout value, -t value   timeout for each HTTP request (default: 5s)
-   --help, -h                  show help
-```
+   AUTHOR:
+      Redowan Delowar
 
-Here's a sample markdown file (examples/sample_1.md):
+   COMMANDS:
+      help, h  Shows a list of commands or help for one command
 
-```md
-This is an [embedded](https://example.com) URL.
+   GLOBAL OPTIONS:
+      --filepath value, -f value  path to the markdown file
+      --timeout value, -t value   timeout for each HTTP request (default: 5s)
+      --error-ok, -e              always exit with code 0 (default: false)
+      --help, -h                  show help
+      --version, -v               print the version
+   ```
 
-This is a [reference style] URL.
+* Find the dead urls in a sample markdown file:
 
-This is a footnote[^1] URL.
+   Here's sample file that we'll use (examples/sample_1.md):
 
-[reference style]: https://reference.com
-[^1]: https://gen.xyz/
-```
+   ```md
+   This is an [embedded](https://example.com) URL.
 
-Check the URLs with the following command with a 2 second timeout:
+   This is a [reference style] URL.
 
-```sh
-link-patrol -f examples/sample_1.md -t 2s
-```
+   This is a footnote[^1] URL.
 
-This returns:
+   [reference style]: https://reference.com
+   [^1]: https://gen.xyz/
+   ```
 
-```txt
-Link patrol
-===========
+   Run the following command with a 2 second timeout for each request:
 
-Filepath: examples/sample_1.md
+   ```sh
+   link-patrol -f examples/sample_1.md -t 2s
+   ```
 
-- URL        : https://example.com
-  Status Code: 200
-  Error      : -
+   This returns:
 
-- URL        : https://gen.xyz/
-  Status Code: 200
-  Error      : -
+   ```txt
+   Link patrol
+   ===========
 
-- URL        : https://reference.com
-  Status Code: 403
-  Error      : -
+   Filepath: examples/sample_1.md
 
-2024/01/19 05:31:17 Some URLs are invalid or unreachable
-exit status 1
-```
+   - URL        : https://reference.com
+   Status Code: 403
+   Error      : -
+
+   - URL        : https://gen.xyz/
+   Status Code: 200
+   Error      : -
+
+   - URL        : https://example.com
+   Status Code: 200
+   Error      : -
+
+   2024/01/20 03:21:49 Some URLs are invalid or unreachable
+   exit status 1
+   ```
+
+* Suppress errors:
+
+   ```sh
+   go run cmd/link-patrol/main.go -f examples/sample_1.md --error-ok
+   ```
+
+   This will force the CLI to exit with code 0.
