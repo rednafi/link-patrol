@@ -77,7 +77,7 @@ Run the following command to list the URL status with a 2 second timeout for eac
 link-patrol -f examples/sample_1.md -t 2s
 ```
 
-By default it'll exit with a non-zero code if any of URLs is invalid or unreachable. Here's
+By default it'll exit with a non-zero code if any of the URLs is invalid or unreachable. Here's
 how the output looks:
 
 ```txt
