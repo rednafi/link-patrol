@@ -4,7 +4,9 @@
 ;; link-petrol ;;
 </h1>
 <p align="center">
+<strong>
 Detect dead links in markdown files
+</strong>
 </p>
 </pre>
 </div>
