@@ -1,11 +1,10 @@
 
-<div align="center">
-   <pre>
-      <h1>
-      ;; link-petrol ;;
-      </h1>
-   <pre>
-</div>
+<span align="center">
+<pre align="center">
+<h1>
+;; link-petrol ;;
+</pre>
+</h1>
 
 ## Installation
 
