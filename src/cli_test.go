@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -182,6 +183,7 @@ func TestPrintHeader(t *testing.T) {
 }
 
 func TestCheckLinks(t *testing.T) {
+	t.Parallel()
 	// Create a test tabwriter.Writer
 	buf := new(bytes.Buffer)
 	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
@@ -200,7 +202,7 @@ func TestCheckLinks(t *testing.T) {
 	errOk := false
 
 	// Call the checkLinks function
-	checkLinks(w, urls, timeout, errOk)
+	_ = checkLinks(w, urls, timeout, errOk)
 
 	// Flush the tabwriter.Writer to get the output
 	w.Flush()
@@ -225,6 +227,92 @@ func TestCheckLinks(t *testing.T) {
 			"checkLinks() = %q, want %q or %q",
 			output, expectedOutput1, expectedOutput2,
 		)
+	}
+}
+
+func TestCheckLinks_RaisesError(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		description     string
+		serverResponses map[string]int // URL path to response code
+		ignoreErrors    bool
+		expectError     bool
+	}{
+		{
+			description: "should error with some bad links",
+			serverResponses: map[string]int{
+				"/good": http.StatusOK,
+				"/bad":  http.StatusInternalServerError,
+			},
+			ignoreErrors: false,
+			expectError:  true,
+		},
+		{
+			description: "should not error with all good links",
+			serverResponses: map[string]int{
+				"/good1": http.StatusOK,
+				"/good2": http.StatusOK,
+			},
+			ignoreErrors: false,
+			expectError:  false,
+		},
+		{
+			description: "should not error with bad links when ignoring errors",
+			serverResponses: map[string]int{
+				"/good": http.StatusOK,
+				"/bad":  http.StatusInternalServerError,
+			},
+			ignoreErrors: true,
+			expectError:  false,
+		},
+	}
+
+	createTestServer := func(responses map[string]int) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				if code, ok := responses[r.URL.Path]; ok {
+					w.WriteHeader(code)
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+	}
+
+	createURLs := func(server *httptest.Server, paths map[string]int) []string {
+		var urls []string
+		for path := range paths {
+			urls = append(urls, server.URL+path)
+		}
+		return urls
+	}
+
+	runCheckLinks := func(
+		w *tabwriter.Writer, urls []string, timeout time.Duration, ignoreErrors bool,
+	) bool {
+		err := checkLinks(w, urls, timeout, ignoreErrors)
+		return err != nil
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.description, func(t *testing.T) {
+			t.Parallel()
+			server := createTestServer(test.serverResponses)
+			defer server.Close()
+
+			urls := createURLs(server, test.serverResponses)
+
+			w := tabwriter.NewWriter(log.Writer(), 0, 0, 0, ' ', 0)
+			errOccurred := runCheckLinks(w, urls, 5*time.Second, test.ignoreErrors)
+
+			if errOccurred != test.expectError {
+				t.Errorf(
+					"checkLinks() error = %v, expectErr %v",
+					errOccurred,
+					test.expectError,
+				)
+			}
+		})
 	}
 }
 
@@ -285,6 +373,6 @@ func BenchmarkCheckUrls(b *testing.B) {
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
 
 	for i := 0; i < b.N; i++ {
-		checkLinks(w, testUrls, 1*time.Second, true)
+		_ = checkLinks(w, testUrls, 1*time.Second, true)
 	}
 }

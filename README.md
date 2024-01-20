@@ -11,18 +11,18 @@ Detect dead links in markdown files
 
 ## Installation
 
-* On MacOS, brew install:
+-   On MacOS, brew install:
 
-   ```sh
-   brew tap rednafi/link-patrol https://github.com/rednafi/link-patrol \
-      && brew install link-patrol
-   ```
+    ```sh
+    brew tap rednafi/link-patrol https://github.com/rednafi/link-patrol \
+       && brew install link-patrol
+    ```
 
-* Or elsewhere, go install:
+-   Or elsewhere, go install:
 
-   ```sh
-   go install github.com/rednafi/link-patrol/cmd/link-patrol
-   ```
+    ```sh
+    go install github.com/rednafi/link-patrol/cmd/link-patrol
+    ```
 
 ## Quickstart
 
@@ -77,8 +77,8 @@ Run the following command to list the URL status with a 2 second timeout for eac
 link-patrol -f examples/sample_1.md -t 2s
 ```
 
-By default, it'll exit with a non-zero code if any of the URLs is invalid or unreachable. Here's
-how the output looks:
+By default, it'll exit with a non-zero code if any of the URLs is invalid or unreachable.
+Here's how the output looks:
 
 ```txt
 Link patrol

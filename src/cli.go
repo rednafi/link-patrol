@@ -33,7 +33,7 @@ func readMarkdown(filepath string) ([]byte, error) {
 }
 
 // Extract URLs from markdown content
-func findLinks(markdown []byte) []string {
+func findLinks(markdown []byte) ([]string, error) {
 	var links []string
 
 	// Parse the markdown content
@@ -62,10 +62,10 @@ func findLinks(markdown []byte) []string {
 		return ast.WalkContinue, nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		return links, err
 	}
 
-	return links
+	return links, nil
 }
 
 // Check the state of a URL and save the result in a struct
@@ -137,7 +137,9 @@ func printLinkRecord(w *tabwriter.Writer, linkRecord linkRecord) {
 }
 
 // Check the state of a list of URLs
-func checkLinks(w *tabwriter.Writer, urls []string, timeout time.Duration, errOk bool) {
+func checkLinks(
+	w *tabwriter.Writer, urls []string, timeout time.Duration, errOk bool,
+) error {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 	var hasError bool
@@ -155,7 +157,6 @@ func checkLinks(w *tabwriter.Writer, urls []string, timeout time.Duration, errOk
 			if urlState.StatusCode >= 400 {
 				hasError = true
 			}
-
 			mutex.Unlock()
 			wg.Done()
 		}(url)
@@ -163,21 +164,32 @@ func checkLinks(w *tabwriter.Writer, urls []string, timeout time.Duration, errOk
 	wg.Wait()
 
 	if hasError && !errOk {
-		log.Fatal("Some URLs are invalid or unreachable")
+		return fmt.Errorf("one or more URLs have an error status code")
 	}
+	return nil
 }
 
 // Orchestrate the whole process
 func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, errOk bool) {
 	defer w.Flush()
+
+	printFilepath(w, filepath)
+
 	// Read markdown file from filepath
 	markdown, err := readMarkdown(filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	urls := findLinks(markdown)
-	checkLinks(w, urls, timeout, errOk)
+	urls, err := findLinks(markdown)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = checkLinks(w, urls, timeout, errOk)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 // CLI
@@ -234,7 +246,6 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 		}
 
 		// Proceed with orchestration as filepath is provided
-		printFilepath(w, filepath)
 		orchestrate(w, filepath, timeout, errOk) // Your orchestrate function
 		return nil
 	}

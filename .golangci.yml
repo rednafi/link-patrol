@@ -1,9 +1,9 @@
 linters:
   enable:
-  - gofmt
-  - gofumpt
-  - nolintlint
-  - lll
+    - gofmt
+    - gofumpt
+    - nolintlint
+    - lll
 
 issues:
   max-issues-per-linter: 0
@@ -12,4 +12,4 @@ issues:
 linters-settings:
   lll:
     line-length: 92 # Set your desired max line length here
-    tab-width: 4    # Optional: set the width of tab characters
+    tab-width: 4 # Optional: set the width of tab characters

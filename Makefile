@@ -13,6 +13,7 @@ lint:
 	@echo "Running lint"
 	@golangci-lint run --fix
 	@go mod tidy
+	@prettier --write .
 
 
 .PHONY: lint-check

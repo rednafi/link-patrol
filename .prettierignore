@@ -1,0 +1,15 @@
+public/
+static/
+layouts/
+themes/
+
+# Ignore
+**/*.html
+**/Makefile
+.editorconfig
+.prettierignore
+.git*
+.hugo*
+Brew*
+pyproject*
+requirements*
