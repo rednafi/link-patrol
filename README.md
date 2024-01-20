@@ -102,3 +102,11 @@ Set the `-e / --error-ok` flag to force the CLI to always exit with code 0.
 ```sh
 go run cmd/link-patrol/main.go -f examples/sample_1.md --error-ok
 ```
+
+### Check multiple files
+
+Do some shell-foo:
+
+```sh
+find examples -name '*.md' -exec link-patrol -f {} -t 4s -e \;
+```
