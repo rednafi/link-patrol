@@ -117,3 +117,10 @@ Do some shell-foo:
 ```sh
 find examples -name '*.md' -exec link-patrol -f {} -t 4s -e \;
 ```
+
+## Known limitations
+
+-   Right now, the tool supports Commonmark and GFM. It hasn't been tested on other markdown
+    implementations.
+
+-   Relative URLs aren't supported at the moment, but that's in the works.
