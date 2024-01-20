@@ -71,7 +71,7 @@ This is a footnote[^1] URL.
 [^1]: https://gen.xyz/
 ```
 
-Run the following command to list thr URL statuses with a 2 second timeout for each request:
+Run the following command to list the URL status with a 2 second timeout for each request:
 
 ```sh
 link-patrol -f examples/sample_1.md -t 2s
