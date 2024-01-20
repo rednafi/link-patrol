@@ -3,9 +3,9 @@
 <h1 align="center">
 ;; link-petrol ;;
 </h1>
-<h4 align="center">
+<h3 align="center">
 Detect dead links in markdown files
-</h4>
+</h3>
 </pre>
 </div>
 
