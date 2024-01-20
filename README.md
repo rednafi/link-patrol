@@ -1,6 +1,4 @@
-<div align="center">
-<img src="./art/logo.webp" width="800" height="400" alt="Image Description">
-</div>
+## Link petrol
 
 ## Installation
 
