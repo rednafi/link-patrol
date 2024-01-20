@@ -201,7 +201,6 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 		return nil
 	}
 
-
 	// Custom Writer
 	app.Writer = w
 	app.ErrWriter = w
@@ -230,7 +229,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 	// Main Action
 	app.Action = func(c *cli.Context) error {
 		defer w.Flush()
-		
+
 		filepath := c.String("filepath")
 		timeout := c.Duration("timeout")
 		errOk := c.Bool("error-ok")
