@@ -4,16 +4,16 @@
 
 * On MacOS, brew install:
 
-```sh
-brew tap rednafi/link-patrol https://github.com/rednafi/link-patrol \
-   && brew install link-patrol
-```
+   ```sh
+   brew tap rednafi/link-patrol https://github.com/rednafi/link-patrol \
+      && brew install link-patrol
+   ```
 
 * Or elsewhere, go install:
 
-```sh
-go install github.com/rednafi/link-patrol/cmd/link-patrol
-```
+   ```sh
+   go install github.com/rednafi/link-patrol/cmd/link-patrol
+   ```
 
 ## Quickstart
 
