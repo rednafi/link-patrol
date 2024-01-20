@@ -1,5 +1,5 @@
 <div align="center">
-<img src="./art/logo.webp" width="600" height="300" alt="Image Description">
+<img src="./art/logo.webp" width="800" height="400" alt="Image Description">
 </div>
 
 ## Installation
