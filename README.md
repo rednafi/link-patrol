@@ -1,10 +1,13 @@
-<span align="center">
+<div align="center">
 <pre align="center">
-<h1>
+<h1 align="center">
 ;; link-petrol ;;
 </h1>
+<p align="center">
+Detect dead links in markdown files
+</p>
 </pre>
-</span>
+</div>
 
 ## Installation
 
