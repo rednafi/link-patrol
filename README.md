@@ -1,7 +1,7 @@
 <div align="center">
 <pre align="center">
 <h1 align="center">
-;; link-petrol ;;
+;; link-patrol ;;
 </h1>
 <h4 align="center">
 Detect dead links in markdown files
