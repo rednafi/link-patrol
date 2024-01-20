@@ -107,7 +107,7 @@ exit status 1
 Set the `-e / --error-ok` flag to force the CLI to always exit with code 0.
 
 ```sh
-link-patrol-f examples/sample_1.md --error-ok
+link-patrol -f examples/sample_1.md -e
 ```
 
 ### Check multiple files
