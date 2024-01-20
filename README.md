@@ -1,4 +1,6 @@
-## Link Patrol
+<div align="center">
+<img src="./art/logo.webp" width="600" height="300" alt="Image Description">
+</div>
 
 ## Installation
 
@@ -24,6 +26,9 @@ link-patrol -h
 ```
 
 ```txt
+Link patrol
+===========
+
 NAME:
    Link patrol - detect dead links in markdown files
 
@@ -32,9 +37,6 @@ USAGE:
 
 VERSION:
    sentinel
-
-AUTHOR:
-   Redowan Delowar
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command

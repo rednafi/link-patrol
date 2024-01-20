@@ -182,6 +182,9 @@ func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, er
 
 // CLI
 func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
+	defer w.Flush()
+	printHeader(w)
+
 	app := cli.NewApp()
 	app.Name = "Link patrol"
 	app.Usage = "detect dead links in markdown files"
@@ -190,16 +193,6 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 	app.HelpName = "Link patrol"
 	app.Suggest = true
 	app.EnableBashCompletion = true
-	app.Authors = []*cli.Author{
-		{
-			Name:  "Redowan Delowar",
-			Email: "",
-		},
-	}
-	app.Before = func(c *cli.Context) error {
-		printHeader(w)
-		return nil
-	}
 
 	// Custom Writer
 	app.Writer = w
