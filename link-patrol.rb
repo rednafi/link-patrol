@@ -5,20 +5,20 @@
 class LinkPatrol < Formula
   desc "Detect dead URLs in markdown files"
   homepage "https://github.com/rednafi/link-patrol"
-  version "0.1-alpha"
+  version "0.1"
 
   on_macos do
-    if Hardware::CPU.intel?
-      url "https://github.com/rednafi/link-patrol/releases/download/v0.1-alpha/link-patrol_Darwin_x86_64.tar.gz"
-      sha256 "5a837b62de87d833a982364c71c91aebbb44357a4b4e72638faa677d38183396"
+    if Hardware::CPU.arm?
+      url "https://github.com/rednafi/link-patrol/releases/download/v0.1/link-patrol_Darwin_arm64.tar.gz"
+      sha256 "b555d3057713bb9ea68087e3730f637a041941afe80f75a0281862b2adccda9a"
 
       def install
         bin.install "link-patrol"
       end
     end
-    if Hardware::CPU.arm?
-      url "https://github.com/rednafi/link-patrol/releases/download/v0.1-alpha/link-patrol_Darwin_arm64.tar.gz"
-      sha256 "7d57e0ead70e10a980aab15c604ff07d29f7398f14630de6b241954eb389ad13"
+    if Hardware::CPU.intel?
+      url "https://github.com/rednafi/link-patrol/releases/download/v0.1/link-patrol_Darwin_x86_64.tar.gz"
+      sha256 "4082421c73c5927f5f33401900da65434ae9a07db0ead3cb388cda98ed042b96"
 
       def install
         bin.install "link-patrol"
@@ -27,17 +27,17 @@ class LinkPatrol < Formula
   end
 
   on_linux do
-    if Hardware::CPU.intel?
-      url "https://github.com/rednafi/link-patrol/releases/download/v0.1-alpha/link-patrol_Linux_x86_64.tar.gz"
-      sha256 "293454efa12c9032a5cf62b91a05b94c12011662c19924aab65ced492fcd1e50"
+    if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
+      url "https://github.com/rednafi/link-patrol/releases/download/v0.1/link-patrol_Linux_arm64.tar.gz"
+      sha256 "dbb47e8600143f25823066bce3888e0de67c3873e1d5d521009bc6c9da23740b"
 
       def install
         bin.install "link-patrol"
       end
     end
-    if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/rednafi/link-patrol/releases/download/v0.1-alpha/link-patrol_Linux_arm64.tar.gz"
-      sha256 "605a22c9f22b450460742569f7d26ce84bec6c1507edd87dc663e0674711e779"
+    if Hardware::CPU.intel?
+      url "https://github.com/rednafi/link-patrol/releases/download/v0.1/link-patrol_Linux_x86_64.tar.gz"
+      sha256 "e8e52d7a8a0e13594dd8c2abe76fd69498e78f2279d60b7d26c5b86ccda2e381"
 
       def install
         bin.install "link-patrol"
