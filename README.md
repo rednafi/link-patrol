@@ -93,7 +93,7 @@ Filepath: examples/sample_1.md
 exit status 1
 ```
 
-### Ignore Errors
+### Ignore errors
 
 Set the `-e / --error-ok` flag to force the CLI to always exit with code 0.
 
