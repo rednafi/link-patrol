@@ -11,7 +11,7 @@ builds:
       - amd64
       - arm64
       - "386"
-    main: ./cmd/httpurr
+    main: ./cmd/link-patrol
 
 archives:
   - format: tar.gz
@@ -42,12 +42,12 @@ changelog:
       - '^test:'
 
 brews:
-  - name: httpurr
-    homepage: "https://github.com/rednafi/httpurr"
-    description: HTTP status codes on speed dial
+  - name: link-patrol
+    homepage: "https://github.com/rednafi/link-patrol"
+    description: Detect dead URLs in markdown files
     repository:
       owner: rednafi
-      name: httpurr
+      name: link-patrol
     commit_author:
       name: rednafi
       email: redowan.nafi@gmail.com
