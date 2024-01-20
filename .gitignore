@@ -26,3 +26,4 @@ go.work
 dist/
 
 .vscode
+.DS_Store
