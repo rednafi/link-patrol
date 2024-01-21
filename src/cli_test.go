@@ -209,8 +209,9 @@ func TestCheckLinks(t *testing.T) {
 	output := buf.String()
 
 	// Verify the output
-	expectedOutput1 := "- Type        : url\n  location    : http://127.0.0.1:55952/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:55952/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
-	expectedOutput2 := "- Type        : url\n  location    : http://127.0.0.1:55929/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:55929/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
+	expectedOutput1 := "- Type        : url\n  location    : http://127.0.0.1:56111/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:56111/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
+
+	expectedOutput2 := "- Type        : url\n  location    : http://127.0.0.1:56133/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:56133/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
 
 	if output != expectedOutput1 && output != expectedOutput2 {
 		t.Errorf(

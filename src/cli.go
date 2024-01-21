@@ -55,7 +55,6 @@ type linkRecord struct {
 // newLinkRecord checks if the input is a valid HTTP/HTTPS URL or a properly formatted
 // filepath and returns a linkRecord struct.
 func newLinkRecord(link string) linkRecord {
-
 	// Check for HTTP/HTTPS URL
 	u, err := url.ParseRequestURI(link)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
@@ -115,7 +114,7 @@ func findLinks(markdown []byte, skipRelative bool) ([]string, error) {
 	parser := goldmark.DefaultParser()
 	document := parser.Parse(reader)
 
-	addLink := func (destination []byte) {
+	addLink := func(destination []byte) {
 		link := string(destination)
 		lr := newLinkRecord(link)
 
@@ -152,7 +151,6 @@ func findLinks(markdown []byte, skipRelative bool) ([]string, error) {
 
 // checkUrl checks the state of a URL
 func checkUrl(lr linkRecord, timeout time.Duration) linkRecord {
-
 	client := &http.Client{
 		Timeout: timeout,
 	}
