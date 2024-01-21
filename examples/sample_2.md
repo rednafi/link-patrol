@@ -16,6 +16,10 @@ This is a [reference with title][ref-title].
 
 This is a footnote[^1] URL.
 
+## Relative URLs
+
+This is a relative[^2] URL.
+
 ## Image URLs
 
 This is an image URL: ![Alt text](https://example.com/image.jpg "Image Title")
@@ -44,3 +48,4 @@ This is a
 [image-ref]: https://example.com/image.jpg
 
 [^1]: https://footnote.com
+[^2]: /examples/sample_2

@@ -5,7 +5,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -32,6 +34,79 @@ func readMarkdown(filepath string) ([]byte, error) {
 	return file, nil
 }
 
+// LinkType is a custom type to represent the type of link
+type LinkType string
+
+// Constants for LinkType
+const (
+	URLType      LinkType = "url"
+	FilePathType LinkType = "filepath"
+)
+
+// Check the state of a URL and save the result in a struct
+type linkRecord struct {
+	Type       LinkType
+	Location   string // resource location
+	StatusCode int    // HTTP status code
+	Ok         bool   // true if the link is reachable
+	ErrMsg     string
+}
+
+// newLinkRecord checks if the input is a valid HTTP/HTTPS URL or a properly formatted
+// filepath and returns a linkRecord struct.
+func newLinkRecord(link string) linkRecord {
+
+	// Check for HTTP/HTTPS URL
+	u, err := url.ParseRequestURI(link)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		return linkRecord{
+			Type:       URLType,
+			Location:   link,
+			StatusCode: 0,
+			Ok:         false,
+			ErrMsg:     "",
+		}
+	}
+
+	// Check for filepath
+	currDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	link = filepath.Clean(link)
+	link = strings.TrimRight(link, string(filepath.Separator))
+
+	if !strings.HasSuffix(link, ".md") {
+		link = link + ".md"
+	}
+
+	link = filepath.Join(currDir, link)
+
+	// Check for valid file path
+	if strings.HasPrefix(link, "/") ||
+		strings.HasPrefix(link, "./") || strings.HasPrefix(link, "../") {
+		return linkRecord{
+			Type:       FilePathType,
+			Location:   link,
+			StatusCode: 0,
+			Ok:         false,
+			ErrMsg:     "",
+		}
+	}
+
+	// Check for Windows-style paths
+	if filepath.IsAbs(link) {
+		return linkRecord{
+			Type:       "filepath",
+			Location:   link,
+			StatusCode: 0,
+			Ok:         false,
+			ErrMsg:     "",
+		}
+	}
+	return linkRecord{}
+}
+
 // Extract URLs from markdown content
 func findLinks(markdown []byte) ([]string, error) {
 	var links []string
@@ -43,9 +118,10 @@ func findLinks(markdown []byte) ([]string, error) {
 
 	// Function to add link if it's an HTTP/S URL
 	addLinkIfHTTP := func(destination []byte) {
-		url := string(destination)
-		if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
-			links = append(links, url)
+		link := string(destination)
+		lr := newLinkRecord(link)
+		if lr.Type == "url" || lr.Type == "filepath" {
+			links = append(links, link)
 		}
 	}
 
@@ -68,38 +144,59 @@ func findLinks(markdown []byte) ([]string, error) {
 	return links, nil
 }
 
-// Check the state of a URL and save the result in a struct
-type linkRecord struct {
-	URL        string
-	StatusCode int
-	ErrMsg     string
-}
+// checkUrl checks the state of a URL
+func checkUrl(lr linkRecord, timeout time.Duration) linkRecord {
 
-// Check the state of a URL
-func checkLink(url string, timeout time.Duration) linkRecord {
 	client := &http.Client{
 		Timeout: timeout,
 	}
 
-	resp, err := client.Get(url)
+	resp, err := client.Get(lr.Location)
 	if err != nil {
+		lr.Ok = false
 		// Check if the error is a timeout
 		if err, ok := err.(net.Error); ok && err.Timeout() {
-			return linkRecord{
-				URL:        url,
-				StatusCode: 0,
-				ErrMsg:     fmt.Sprintf("Request timed out after %s", timeout),
-			}
+			lr.ErrMsg = fmt.Sprintf("Request timed out after %s", timeout)
+			return lr
 		}
-		return linkRecord{
-			URL:        url,
-			StatusCode: 0,
-			ErrMsg:     err.Error(),
-		}
+		lr.ErrMsg = err.Error()
+		return lr
 	}
 	defer resp.Body.Close()
 
-	return linkRecord{URL: url, StatusCode: resp.StatusCode, ErrMsg: ""}
+	// Set lr.Ok to false if the status code is an error code
+	if lr.StatusCode >= 400 {
+		lr.Ok = false
+		lr.ErrMsg = "Unreachable URL"
+	}
+
+	lr.StatusCode = resp.StatusCode
+	lr.Ok = true
+
+	return lr
+}
+
+// checkFilepath checks the state of a filepath
+func checkFilepath(lr linkRecord) linkRecord {
+	if _, err := os.Stat(lr.Location); err == nil {
+		lr.Ok = true
+		return lr
+	}
+	lr.Ok = false
+	lr.ErrMsg = fmt.Sprintf("Filepath %s does not exist", lr.Location)
+	return lr
+}
+
+// Check the state of a URL or filepath
+func checkLink(link string, timeout time.Duration) linkRecord {
+	switch lr := newLinkRecord(link); lr.Type {
+	case "url":
+		return checkUrl(lr, timeout)
+	case "filepath":
+		return checkFilepath(lr)
+	default:
+		return linkRecord{}
+	}
 }
 
 // Print a pretty header
@@ -115,12 +212,14 @@ func printFilepath(w *tabwriter.Writer, filepath string) {
 }
 
 // Print the URL states
-func printLinkRecord(w *tabwriter.Writer, linkRecord linkRecord) {
+func printLinkRecord(w *tabwriter.Writer, lr linkRecord) {
 	defer w.Flush()
 
-	const tpl = `- URL        : {{.URL}}
-  Status Code: {{if eq .StatusCode 0}}-{{else}}{{.StatusCode}}{{end}}
-  Error      : {{if .ErrMsg}}{{.ErrMsg}}{{else}}-{{end}}
+	const tpl = `- Type        : {{.Type}}
+  location    : {{.Location}}
+  Status Code : {{if eq .StatusCode 0}}-{{else}}{{.StatusCode}}{{end}}
+  Ok          : {{.Ok}}
+  Error       : {{if .ErrMsg}}{{.ErrMsg}}{{else}}-{{end}}
 
 `
 	t, err := template.New("linkRecord").Parse(tpl)
@@ -129,7 +228,7 @@ func printLinkRecord(w *tabwriter.Writer, linkRecord linkRecord) {
 		return
 	}
 
-	err = t.Execute(w, linkRecord)
+	err = t.Execute(w, lr)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -138,23 +237,23 @@ func printLinkRecord(w *tabwriter.Writer, linkRecord linkRecord) {
 
 // Check the state of a list of URLs
 func checkLinks(
-	w *tabwriter.Writer, urls []string, timeout time.Duration, errOk bool,
+	w *tabwriter.Writer, links []string, timeout time.Duration, errOk bool,
 ) error {
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 	var hasError bool
 
-	for _, url := range urls {
+	for _, url := range links {
 		wg.Add(1)
 		go func(url string) {
-			urlState := checkLink(url, timeout)
+			lr := checkLink(url, timeout)
 
 			// Print the URL state
 			mutex.Lock()
-			printLinkRecord(w, urlState)
+			printLinkRecord(w, lr)
 
 			// Raise error if the URL state has an error status code
-			if urlState.StatusCode >= 400 {
+			if lr.StatusCode >= 400 {
 				hasError = true
 			}
 			mutex.Unlock()
@@ -164,7 +263,7 @@ func checkLinks(
 	wg.Wait()
 
 	if hasError && !errOk {
-		return fmt.Errorf("one or more URLs have an error status code")
+		return fmt.Errorf("one or more links are unreachable")
 	}
 	return nil
 }
@@ -220,7 +319,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 		&cli.DurationFlag{
 			Name:    "timeout",
 			Aliases: []string{"t"},
-			Value:   5 * time.Second,
+			Value:   30 * time.Second,
 			Usage:   "timeout for each HTTP request",
 		},
 		&cli.BoolFlag{
@@ -246,13 +345,13 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 		}
 
 		// Proceed with orchestration as filepath is provided
-		orchestrate(w, filepath, timeout, errOk) // Your orchestrate function
+		orchestrate(w, filepath, timeout, errOk)
 		return nil
 	}
 
 	// Handle execution
 	err := app.Run(os.Args)
 	if err != nil {
-		exitFunc(2) // Your exitFunc function
+		exitFunc(2)
 	}
 }
