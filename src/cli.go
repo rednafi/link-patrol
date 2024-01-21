@@ -20,7 +20,7 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// Read markdown file from filepath
+// readMarkdown reads a markdown file from a filepath
 func readMarkdown(filepath string) ([]byte, error) {
 	file, err := os.ReadFile(filepath)
 	if err != nil {
@@ -34,22 +34,22 @@ func readMarkdown(filepath string) ([]byte, error) {
 	return file, nil
 }
 
-// LinkType is a custom type to represent the type of link
-type LinkType string
+// linkType is a custom type to represent the type of a link
+type linkType string
 
 // Constants for LinkType
 const (
-	URLType      LinkType = "url"
-	FilePathType LinkType = "filepath"
+	urlType      linkType = "url"
+	filepathType linkType = "filepath"
 )
 
 // Check the state of a URL and save the result in a struct
 type linkRecord struct {
-	Type       LinkType
-	Location   string // resource location
-	StatusCode int    // HTTP status code
-	Ok         bool   // true if the link is reachable
-	ErrMsg     string
+	Type       linkType // literal url or filepath
+	Location   string   // value of the url or filepath
+	StatusCode int      // status code of the url
+	Ok         bool     // true if the link is reachable
+	ErrMsg     string   // error message if the link is unreachable
 }
 
 // newLinkRecord checks if the input is a valid HTTP/HTTPS URL or a properly formatted
@@ -60,7 +60,7 @@ func newLinkRecord(link string) linkRecord {
 	u, err := url.ParseRequestURI(link)
 	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
 		return linkRecord{
-			Type:       URLType,
+			Type:       urlType,
 			Location:   link,
 			StatusCode: 0,
 			Ok:         false,
@@ -82,11 +82,10 @@ func newLinkRecord(link string) linkRecord {
 
 	link = filepath.Join(currDir, link)
 
-	// Check for valid file path
 	if strings.HasPrefix(link, "/") ||
 		strings.HasPrefix(link, "./") || strings.HasPrefix(link, "../") {
 		return linkRecord{
-			Type:       FilePathType,
+			Type:       filepathType,
 			Location:   link,
 			StatusCode: 0,
 			Ok:         false,
@@ -108,7 +107,7 @@ func newLinkRecord(link string) linkRecord {
 }
 
 // Extract URLs from markdown content
-func findLinks(markdown []byte) ([]string, error) {
+func findLinks(markdown []byte, skipRelative bool) ([]string, error) {
 	var links []string
 
 	// Parse the markdown content
@@ -116,12 +115,19 @@ func findLinks(markdown []byte) ([]string, error) {
 	parser := goldmark.DefaultParser()
 	document := parser.Parse(reader)
 
-	// Function to add link if it's an HTTP/S URL
-	addLinkIfHTTP := func(destination []byte) {
+	addLink := func (destination []byte) {
 		link := string(destination)
 		lr := newLinkRecord(link)
-		if lr.Type == "url" || lr.Type == "filepath" {
+
+		// Skip adding the link if it's a file path and we're skipping relative links
+		if lr.Type == filepathType && skipRelative {
+			return
+		}
+
+		// Add the link if it's an HTTP/S URL or a file path
+		if lr.Type == urlType || lr.Type == filepathType {
 			links = append(links, link)
+			return
 		}
 	}
 
@@ -130,9 +136,9 @@ func findLinks(markdown []byte) ([]string, error) {
 		if entering {
 			switch n := node.(type) {
 			case *ast.Link:
-				addLinkIfHTTP(n.Destination)
+				addLink(n.Destination)
 			case *ast.Image:
-				addLinkIfHTTP(n.Destination)
+				addLink(n.Destination)
 			}
 		}
 		return ast.WalkContinue, nil
@@ -269,7 +275,7 @@ func checkLinks(
 }
 
 // Orchestrate the whole process
-func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, errOk bool) {
+func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, skipRelative bool, errOk bool) {
 	defer w.Flush()
 
 	printFilepath(w, filepath)
@@ -277,10 +283,10 @@ func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, er
 	// Read markdown file from filepath
 	markdown, err := readMarkdown(filepath)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
-	urls, err := findLinks(markdown)
+	urls, err := findLinks(markdown, skipRelative)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -323,6 +329,12 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 			Usage:   "timeout for each HTTP request",
 		},
 		&cli.BoolFlag{
+			Name:    "skip-relative",
+			Aliases: []string{"s"},
+			Value:   false,
+			Usage:   "skip relative paths",
+		},
+		&cli.BoolFlag{
 			Name:    "error-ok",
 			Aliases: []string{"e"},
 			Value:   false,
@@ -336,6 +348,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 
 		filepath := c.String("filepath")
 		timeout := c.Duration("timeout")
+		skipRelative := c.Bool("skip-relative")
 		errOk := c.Bool("error-ok")
 
 		if filepath == "" {
@@ -345,7 +358,7 @@ func Cli(w *tabwriter.Writer, version string, exitFunc func(int)) {
 		}
 
 		// Proceed with orchestration as filepath is provided
-		orchestrate(w, filepath, timeout, errOk)
+		orchestrate(w, filepath, timeout, skipRelative, errOk)
 		return nil
 	}
 

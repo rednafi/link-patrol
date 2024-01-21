@@ -209,18 +209,8 @@ func TestCheckLinks(t *testing.T) {
 	output := buf.String()
 
 	// Verify the output
-	expectedOutput1 := "- URL        : " + ts.URL + "/ok\n" +
-		"  Status Code: 200\n" +
-		"  Error      : -\n\n" +
-		"- URL        : " + ts.URL + "/invalid-url\n" +
-		"  Status Code: 200\n" +
-		"  Error      : -\n\n"
-	expectedOutput2 := "- URL        : " + ts.URL + "/invalid-url\n" +
-		"  Status Code: 200\n" +
-		"  Error      : -\n\n" +
-		"- URL        : " + ts.URL + "/ok\n" +
-		"  Status Code: 200\n" +
-		"  Error      : -\n\n"
+	expectedOutput1 := "- Type        : url\n  location    : http://127.0.0.1:55952/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:55952/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
+	expectedOutput2 := "- Type        : url\n  location    : http://127.0.0.1:55929/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:55929/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
 
 	if output != expectedOutput1 && output != expectedOutput2 {
 		t.Errorf(
@@ -320,8 +310,8 @@ func TestCheckLinks_RaisesError(t *testing.T) {
 func TestPrintLinkRecord(t *testing.T) {
 	t.Parallel()
 	linkRecords := []linkRecord{
-		{"http://example.com", 200, "OK"},
-		{"http://testsite.com", 404, "Not Found"},
+		{"url", "http://example.com", 200, true, ""},
+		{"url", "http://testsite.com", 404, false, "Not Found"},
 	}
 
 	var buf bytes.Buffer
