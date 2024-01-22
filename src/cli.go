@@ -273,7 +273,10 @@ func checkLinks(
 }
 
 // Orchestrate the whole process
-func orchestrate(w *tabwriter.Writer, filepath string, timeout time.Duration, skipRelative bool, errOk bool) {
+func orchestrate(
+	w *tabwriter.Writer, filepath string, timeout time.Duration,
+	skipRelative bool, errOk bool,
+) {
 	defer w.Flush()
 
 	printFilepath(w, filepath)

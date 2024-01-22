@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -91,6 +92,81 @@ func TestReadMarkdown_NonMarkdownFile(t *testing.T) {
 
 	if err == nil {
 		t.Errorf("Expected an error, got no error")
+	}
+}
+
+func TestNewLinkRecord(t *testing.T) {
+	tests := []struct {
+		name     string
+		link     string
+		wantType linkType
+		wantOk   bool
+		wantErr  string
+	}{
+		{
+			name:     "Valid HTTP URL",
+			link:     "http://example.com",
+			wantType: urlType,
+			wantOk:   false,
+			wantErr:  "",
+		},
+		{
+			name:     "Valid HTTPS URL",
+			link:     "https://example.com",
+			wantType: urlType,
+			wantOk:   false,
+			wantErr:  "",
+		},
+		{
+			name:     "Invalid URL",
+			link:     "htt://example.com",
+			wantType: urlType,
+			wantOk:   false,
+			wantErr:  "",
+		},
+		// {
+		// 	name:     "Valid Relative Filepath",
+		// 	link:     "./test.md",
+		// 	wantType: filepathType,
+		// 	wantOk:   false,
+		// 	wantErr:  false,
+		// },
+		// {
+		// 	name:     "Valid Absolute Filepath",
+		// 	link:     "/tmp/test.md",
+		// 	wantType: filepathType,
+		// 	wantOk:   false,
+		// 	wantErr:  false,
+		// },
+		// {
+		// 	name:     "Invalid Filepath",
+		// 	link:     "invalidpath/test",
+		// 	wantType: "",
+		// 	wantOk:   false,
+		// 	wantErr:  true,
+		// },
+		// {
+		// 	name:     "Windows Style Absolute Path",
+		// 	link:     "C:\\test.md",
+		// 	wantType: filepathType,
+		// 	wantOk:   false,
+		// 	wantErr:  false,
+		// },
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := newLinkRecord(tt.link)
+			if got.ErrMsg != tt.wantErr {
+				t.Errorf("newLinkRecord() error = %v, wantErr %v", got.ErrMsg, tt.wantErr)
+			}
+			if got.Type != tt.wantType {
+				t.Errorf("newLinkRecord() Type = %v, wantType %v", got.Type, tt.wantType)
+			}
+			if got.Ok != tt.wantOk {
+				t.Errorf("newLinkRecord() Ok = %v, wantOk %v", got.Ok, tt.wantOk)
+			}
+		})
 	}
 }
 
@@ -188,36 +264,40 @@ func TestCheckLinks(t *testing.T) {
 	buf := new(bytes.Buffer)
 	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
 
-	// Create a test server that always returns a specific status code
+	// Create a test server returning a status code
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
 
-	// Create a list of test URLs
+	// List of test URLs
 	urls := []string{ts.URL + "/ok", ts.URL + "/invalid-url"}
 
-	// Set the timeout and error flag for testing
+	// Set timeout and error flag for testing
 	timeout := time.Second
 	errOk := false
 
-	// Call the checkLinks function
+	// Call checkLinks function
 	_ = checkLinks(w, urls, timeout, errOk)
 
-	// Flush the tabwriter.Writer to get the output
+	// Flush tabwriter.Writer for output
 	w.Flush()
 	output := buf.String()
 
 	// Verify the output
-	expectedOutput1 := "- Type        : url\n  location    : http://127.0.0.1:56111/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:56111/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
+	expOutput1 := fmt.Sprintf("- Type        : url\n  location    : %s/invalid-url\n"+
+		"  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"+
+		"- Type        : url\n  location    : %s/ok\n  Status Code : 200\n"+
+		"  Ok          : true\n  Error       : -\n\n", ts.URL, ts.URL)
 
-	expectedOutput2 := "- Type        : url\n  location    : http://127.0.0.1:56133/ok\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n- Type        : url\n  location    : http://127.0.0.1:56133/invalid-url\n  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"
+	expOutput2 := fmt.Sprintf("- Type        : url\n  location    : %s/ok\n"+
+		"  Status Code : 200\n  Ok          : true\n  Error       : -\n\n"+
+		"- Type        : url\n  location    : %s/invalid-url\n  Status Code : 200\n"+
+		"  Ok          : true\n  Error       : -\n\n", ts.URL, ts.URL)
 
-	if output != expectedOutput1 && output != expectedOutput2 {
-		t.Errorf(
-			"checkLinks() = %q, want %q or %q",
-			output, expectedOutput1, expectedOutput2,
-		)
+	if output != expOutput1 && output != expOutput2 {
+		t.Errorf("checkLinks() = %q, want %q or %q",
+			output, expOutput1, expOutput2)
 	}
 }
 
@@ -307,9 +387,11 @@ func TestCheckLinks_RaisesError(t *testing.T) {
 	}
 }
 
-// Test for printUrlState function
+// Test for printLinkRecord function
 func TestPrintLinkRecord(t *testing.T) {
 	t.Parallel()
+
+	// Create a slice of linkRecords
 	linkRecords := []linkRecord{
 		{"url", "http://example.com", 200, true, ""},
 		{"url", "http://testsite.com", 404, false, "Not Found"},
@@ -318,21 +400,22 @@ func TestPrintLinkRecord(t *testing.T) {
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
 
-	for _, linkRecord := range linkRecords {
-		printLinkRecord(w, linkRecord)
+	// Process each linkRecord
+	for _, lr := range linkRecords {
+		printLinkRecord(w, lr)
 	}
 	w.Flush()
 
-	expectedOutput := "- URL        : http://example.com\n" +
-		"  Status Code: 200\n" +
-		"  Error      : OK\n\n" +
-		"- URL        : http://testsite.com\n" +
-		"  Status Code: 404\n" +
-		"  Error      : Not Found\n\n"
+	// Define expected output
+	expOutput := "- Type        : url\n  location    : http://example.com\n" +
+		"  Status Code : 200\n  Ok          : true\n  Error       : -\n\n" +
+		"- Type        : url\n  location    : http://testsite.com\n" +
+		"  Status Code : 404\n  Ok          : false\n  Error       : Not Found\n\n"
 	actualOutput := buf.String()
 
-	if actualOutput != expectedOutput {
-		t.Errorf("printUrlState() = %q, want %q", actualOutput, expectedOutput)
+	// Assert output correctness
+	if actualOutput != expOutput {
+		t.Errorf("printLinkRecord() = %q, want %q", actualOutput, expOutput)
 	}
 }
 
