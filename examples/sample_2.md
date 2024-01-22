@@ -33,6 +33,10 @@ This is a referenced image: ![Alt text][image-ref]
 This is a
 [long URL](https://www.terminusapp.com/blog/short-urls-vs-long-urls/#:~:text=On%20the%20other%20hand%2C%20long,folders%2C%20subfolders%2C%20and%20parameters.)
 
+## Invalid URL
+
+This is an invalid link[^3].
+
 ## Automatic URL Linking
 
 <https://example.com>
@@ -48,4 +52,5 @@ This is a
 [image-ref]: https://example.com/image.jpg
 
 [^1]: https://footnote.com
-[^2]: /examples/sample_2
+[^2]: ./sample_3.md
+[^3]: hh://invalid

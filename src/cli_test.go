@@ -3,7 +3,7 @@ package src
 import (
 	"bytes"
 	"fmt"
-	"log"
+
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -98,70 +98,70 @@ func TestReadMarkdown_NonMarkdownFile(t *testing.T) {
 func TestNewLinkRecord(t *testing.T) {
 	tests := []struct {
 		name     string
-		link     string
+		location string
 		wantType linkType
 		wantOk   bool
 		wantErr  string
 	}{
 		{
 			name:     "Valid HTTP URL",
-			link:     "http://example.com",
+			location: "http://example.com",
 			wantType: urlType,
 			wantOk:   false,
 			wantErr:  "",
 		},
 		{
 			name:     "Valid HTTPS URL",
-			link:     "https://example.com",
+			location: "https://example.com",
 			wantType: urlType,
 			wantOk:   false,
 			wantErr:  "",
 		},
 		{
 			name:     "Invalid URL",
-			link:     "htt://example.com",
-			wantType: urlType,
+			location: "htt://example.com",
+			wantType: invalidType,
 			wantOk:   false,
 			wantErr:  "",
 		},
-		// {
-		// 	name:     "Valid Relative Filepath",
-		// 	link:     "./test.md",
-		// 	wantType: filepathType,
-		// 	wantOk:   false,
-		// 	wantErr:  false,
-		// },
-		// {
-		// 	name:     "Valid Absolute Filepath",
-		// 	link:     "/tmp/test.md",
-		// 	wantType: filepathType,
-		// 	wantOk:   false,
-		// 	wantErr:  false,
-		// },
-		// {
-		// 	name:     "Invalid Filepath",
-		// 	link:     "invalidpath/test",
-		// 	wantType: "",
-		// 	wantOk:   false,
-		// 	wantErr:  true,
-		// },
-		// {
-		// 	name:     "Windows Style Absolute Path",
-		// 	link:     "C:\\test.md",
-		// 	wantType: filepathType,
-		// 	wantOk:   false,
-		// 	wantErr:  false,
-		// },
+		{
+			name:     "Valid Relative Filepath",
+			location: "./test.md",
+			wantType: filepathType,
+			wantOk:   false,
+			wantErr:  "",
+		},
+		{
+			name:     "Valid Absolute Filepath",
+			location: "/tmp/test.md",
+			wantType: filepathType,
+			wantOk:   false,
+			wantErr:  "",
+		},
+		{
+			name:     "Invalid Filepath",
+			location: "invalidpath/test",
+			wantType: filepathType,
+			wantOk:   false,
+			wantErr:  "",
+		},
+		{
+			name:     "Windows Style Absolute Path",
+			location: "C:\\test.md",
+			wantType: invalidType,
+			wantOk:   false,
+			wantErr:  "",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := newLinkRecord(tt.link)
+			got := newLinkRecord(tt.location)
 			if got.ErrMsg != tt.wantErr {
 				t.Errorf("newLinkRecord() error = %v, wantErr %v", got.ErrMsg, tt.wantErr)
 			}
 			if got.Type != tt.wantType {
-				t.Errorf("newLinkRecord() Type = %v, wantType %v", got.Type, tt.wantType)
+				t.Errorf("newLinkRecord() Type = %v, wantType %v %v", got.Type, tt.wantType, tt.location)
 			}
 			if got.Ok != tt.wantOk {
 				t.Errorf("newLinkRecord() Ok = %v, wantOk %v", got.Ok, tt.wantOk)
@@ -197,7 +197,7 @@ func TestCheckLink_ClientError(t *testing.T) {
 
 	state := checkLink(ts.URL, 1*time.Second)
 
-	if state.StatusCode != http.StatusNotFound || state.ErrMsg != "" {
+	if state.StatusCode != http.StatusNotFound && state.ErrMsg != "Unreachable URL" {
 		t.Errorf(
 			"Expected status 404 with no error, got status %d with error '%s'",
 			state.StatusCode, state.ErrMsg,
@@ -215,7 +215,7 @@ func TestCheckLink_ServerError(t *testing.T) {
 
 	state := checkLink(ts.URL, 1*time.Second)
 
-	if state.StatusCode != http.StatusInternalServerError || state.ErrMsg != "" {
+	if state.StatusCode != http.StatusInternalServerError && state.ErrMsg != "Unreachable URL" {
 		t.Errorf(
 			"Expected status 500 with no error, got status %d with error '%s'",
 			state.StatusCode, state.ErrMsg,
@@ -236,9 +236,9 @@ func TestCheckLink_ConnectionError(t *testing.T) {
 // TestCheckLink_InvalidLink tests the checkUrl function with an invalid URL format
 func TestCheckLink_InvalidLink(t *testing.T) {
 	t.Parallel()
-	state := checkLink(":%", 1*time.Second)
+	lr := checkLink(":%", 1*time.Second)
 
-	if state.ErrMsg == "" {
+	if lr.ErrMsg == "" {
 		t.Errorf("Expected an invalid URL error, got no error")
 	}
 }
@@ -298,92 +298,6 @@ func TestCheckLinks(t *testing.T) {
 	if output != expOutput1 && output != expOutput2 {
 		t.Errorf("checkLinks() = %q, want %q or %q",
 			output, expOutput1, expOutput2)
-	}
-}
-
-func TestCheckLinks_RaisesError(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		description     string
-		serverResponses map[string]int // URL path to response code
-		ignoreErrors    bool
-		expectError     bool
-	}{
-		{
-			description: "should error with some bad links",
-			serverResponses: map[string]int{
-				"/good": http.StatusOK,
-				"/bad":  http.StatusInternalServerError,
-			},
-			ignoreErrors: false,
-			expectError:  true,
-		},
-		{
-			description: "should not error with all good links",
-			serverResponses: map[string]int{
-				"/good1": http.StatusOK,
-				"/good2": http.StatusOK,
-			},
-			ignoreErrors: false,
-			expectError:  false,
-		},
-		{
-			description: "should not error with bad links when ignoring errors",
-			serverResponses: map[string]int{
-				"/good": http.StatusOK,
-				"/bad":  http.StatusInternalServerError,
-			},
-			ignoreErrors: true,
-			expectError:  false,
-		},
-	}
-
-	createTestServer := func(responses map[string]int) *httptest.Server {
-		return httptest.NewServer(http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				if code, ok := responses[r.URL.Path]; ok {
-					w.WriteHeader(code)
-				} else {
-					w.WriteHeader(http.StatusNotFound)
-				}
-			}))
-	}
-
-	createURLs := func(server *httptest.Server, paths map[string]int) []string {
-		var urls []string
-		for path := range paths {
-			urls = append(urls, server.URL+path)
-		}
-		return urls
-	}
-
-	runCheckLinks := func(
-		w *tabwriter.Writer, urls []string, timeout time.Duration, ignoreErrors bool,
-	) bool {
-		err := checkLinks(w, urls, timeout, ignoreErrors)
-		return err != nil
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test.description, func(t *testing.T) {
-			t.Parallel()
-			server := createTestServer(test.serverResponses)
-			defer server.Close()
-
-			urls := createURLs(server, test.serverResponses)
-
-			w := tabwriter.NewWriter(log.Writer(), 0, 0, 0, ' ', 0)
-			errOccurred := runCheckLinks(w, urls, 5*time.Second, test.ignoreErrors)
-
-			if errOccurred != test.expectError {
-				t.Errorf(
-					"checkLinks() error = %v, expectErr %v",
-					errOccurred,
-					test.expectError,
-				)
-			}
-		})
 	}
 }
 

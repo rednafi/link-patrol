@@ -41,6 +41,7 @@ type linkType string
 const (
 	urlType      linkType = "url"
 	filepathType linkType = "filepath"
+	invalidType  linkType = "invalid"
 )
 
 // Check the state of a URL and save the result in a struct
@@ -52,12 +53,49 @@ type linkRecord struct {
 	ErrMsg     string   // error message if the link is unreachable
 }
 
+func isUrl(s string) bool {
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return u.Scheme != ""
+}
+
+func isRelativePath(s string) bool {
+	if len(s) <= 1 {
+		return true
+	}
+
+	if s[0] == '/' {
+		return false
+	}
+	return !strings.Contains(s, ":/") && !strings.Contains(s, ":\\")
+}
+
+func makeAbsolutePath(s string) (string, error) {
+	// Check for filepath
+	currDir, err := os.Getwd()
+	if err != nil {
+		return s, err
+	}
+	path := filepath.Clean(s)
+	path = strings.TrimRight(path, string(filepath.Separator))
+
+	// Append ".md" if no file extension
+	if filepath.Ext(path) == "" {
+		path += ".md"
+	}
+
+	// Join with current directory
+	path = filepath.Join(currDir, path)
+	return path, nil
+}
+
 // newLinkRecord checks if the input is a valid HTTP/HTTPS URL or a properly formatted
 // filepath and returns a linkRecord struct.
 func newLinkRecord(link string) linkRecord {
-	// Check for HTTP/HTTPS URL
-	u, err := url.ParseRequestURI(link)
-	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+	switch {
+	case isUrl(link):
 		return linkRecord{
 			Type:       urlType,
 			Location:   link,
@@ -65,24 +103,14 @@ func newLinkRecord(link string) linkRecord {
 			Ok:         false,
 			ErrMsg:     "",
 		}
-	}
 
-	// Check for filepath
-	currDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	link = filepath.Clean(link)
-	link = strings.TrimRight(link, string(filepath.Separator))
+	case isRelativePath(link):
+		link, err := makeAbsolutePath(link)
 
-	if !strings.HasSuffix(link, ".md") {
-		link = link + ".md"
-	}
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	link = filepath.Join(currDir, link)
-
-	if strings.HasPrefix(link, "/") ||
-		strings.HasPrefix(link, "./") || strings.HasPrefix(link, "../") {
 		return linkRecord{
 			Type:       filepathType,
 			Location:   link,
@@ -90,19 +118,16 @@ func newLinkRecord(link string) linkRecord {
 			Ok:         false,
 			ErrMsg:     "",
 		}
-	}
 
-	// Check for Windows-style paths
-	if filepath.IsAbs(link) {
+	default:
 		return linkRecord{
-			Type:       "filepath",
+			Type:       invalidType,
 			Location:   link,
 			StatusCode: 0,
 			Ok:         false,
 			ErrMsg:     "",
 		}
 	}
-	return linkRecord{}
 }
 
 // Extract URLs from markdown content
@@ -122,12 +147,7 @@ func findLinks(markdown []byte, skipRelative bool) ([]string, error) {
 		if lr.Type == filepathType && skipRelative {
 			return
 		}
-
-		// Add the link if it's an HTTP/S URL or a file path
-		if lr.Type == urlType || lr.Type == filepathType {
-			links = append(links, link)
-			return
-		}
+		links = append(links, link)
 	}
 
 	// Traverse the AST to find link and image nodes
@@ -149,33 +169,27 @@ func findLinks(markdown []byte, skipRelative bool) ([]string, error) {
 	return links, nil
 }
 
-// checkUrl checks the state of a URL
+// CheckUrl checks the state of a URL
 func checkUrl(lr linkRecord, timeout time.Duration) linkRecord {
-	client := &http.Client{
-		Timeout: timeout,
-	}
+	client := &http.Client{Timeout: timeout}
 
 	resp, err := client.Get(lr.Location)
 	if err != nil {
 		lr.Ok = false
-		// Check if the error is a timeout
-		if err, ok := err.(net.Error); ok && err.Timeout() {
+		lr.ErrMsg = "Request failed: " + err.Error()
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			lr.ErrMsg = fmt.Sprintf("Request timed out after %s", timeout)
-			return lr
 		}
-		lr.ErrMsg = err.Error()
 		return lr
 	}
 	defer resp.Body.Close()
 
-	// Set lr.Ok to false if the status code is an error code
-	if lr.StatusCode >= 400 {
-		lr.Ok = false
+	lr.StatusCode = resp.StatusCode
+	lr.Ok = resp.StatusCode < 400
+
+	if !lr.Ok {
 		lr.ErrMsg = "Unreachable URL"
 	}
-
-	lr.StatusCode = resp.StatusCode
-	lr.Ok = true
 
 	return lr
 }
@@ -191,15 +205,15 @@ func checkFilepath(lr linkRecord) linkRecord {
 	return lr
 }
 
-// Check the state of a URL or filepath
+// checkLink checks the state of a URL or filepath
 func checkLink(link string, timeout time.Duration) linkRecord {
 	switch lr := newLinkRecord(link); lr.Type {
-	case "url":
+	case urlType:
 		return checkUrl(lr, timeout)
-	case "filepath":
+	case filepathType:
 		return checkFilepath(lr)
 	default:
-		return linkRecord{}
+		return lr
 	}
 }
 
