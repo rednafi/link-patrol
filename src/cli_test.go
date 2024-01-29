@@ -192,7 +192,7 @@ func TestCheckLink_Success(t *testing.T) {
 	)
 	defer ts.Close()
 
-	lr := checkLink(ts.Location, 1*time.Second)
+	lr := checkLink(ts.URL, 1*time.Second)
 
 	assert.Equal(t, http.StatusOK, lr.StatusCode, "Status code should be 200")
 	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
@@ -209,7 +209,7 @@ func TestCheckLink_ClientError(t *testing.T) {
 	)
 	defer ts.Close()
 
-	lr := checkLink(ts.Location, 1*time.Second)
+	lr := checkLink(ts.URL, 1*time.Second)
 
 	assert.Equal(
 		t,
@@ -230,7 +230,7 @@ func TestCheckLink_ServerError(t *testing.T) {
 	)
 	defer ts.Close()
 
-	lr := checkLink(ts.Location, 1*time.Second)
+	lr := checkLink(ts.URL, 1*time.Second)
 
 	assert.Equal(
 		t,
@@ -381,7 +381,7 @@ func TestCheckLinks(t *testing.T) {
 	defer ts.Close()
 
 	// Create a list of test URLs
-	urls := []string{ts.Location + "/ok", ts.Location + "/invalid-url"}
+	urls := []string{ts.URL + "/ok", ts.URL + "/invalid-url"}
 
 	// Set the timeout and error flag for testing
 	timeout := time.Second
@@ -395,16 +395,16 @@ func TestCheckLinks(t *testing.T) {
 	output := buf.String()
 
 	// Verify the output
-	expectedOutput1 := "- Location   : " + ts.Location + "/ok\n" +
+	expectedOutput1 := "- Location   : " + ts.URL + "/ok\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n" +
-		"- Location   : " + ts.Location + "/invalid-url\n" +
+		"- Location   : " + ts.URL + "/invalid-url\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n"
-	expectedOutput2 := "- Location   : " + ts.Location + "/invalid-url\n" +
+	expectedOutput2 := "- Location   : " + ts.URL + "/invalid-url\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n" +
-		"- Location   : " + ts.Location + "/ok\n" +
+		"- Location   : " + ts.URL + "/ok\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n"
 
@@ -467,7 +467,7 @@ func TestCheckLinks_RaisesError(t *testing.T) {
 	createURLs := func(server *httptest.Server, paths map[string]int) []string {
 		var urls []string
 		for path := range paths {
-			urls = append(urls, server.Location+path)
+			urls = append(urls, server.URL+path)
 		}
 		return urls
 	}
@@ -520,9 +520,9 @@ func BenchmarkCheckUrls(b *testing.B) {
 	defer ts.Close()
 
 	testUrls := []string{
-		ts.Location + "/ok",
-		ts.Location + "/notfound",
-		ts.Location + "/error",
+		ts.URL + "/ok",
+		ts.URL + "/notfound",
+		ts.URL + "/error",
 		"http://localhost:12345", // Connection error
 		":%",                     // Invalid URL
 	}
