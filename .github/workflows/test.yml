@@ -19,8 +19,8 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
-          cache: true
+          go-version: "1.21.6"
+          cache: false
 
       - name: Install dependencies
         run: make init

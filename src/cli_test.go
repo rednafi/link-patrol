@@ -192,11 +192,12 @@ func TestCheckLink_Success(t *testing.T) {
 	)
 	defer ts.Close()
 
-	lr := checkLink(ts.Location, 1*time.Second)
+	lr := checkLink(ts.URL, 1*time.Second)
 
 	assert.Equal(t, http.StatusOK, lr.StatusCode, "Status code should be 200")
 	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
 }
+
 
 // TestCheckLink_ClientError tests the checkUrl function with a client error
 func TestCheckLink_ClientError(t *testing.T) {
