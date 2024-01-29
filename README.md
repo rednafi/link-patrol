@@ -33,9 +33,6 @@ link-patrol -h
 ```
 
 ```txt
-Link patrol
-===========
-
 NAME:
    Link patrol - detect dead links in markdown files
 
@@ -43,7 +40,7 @@ USAGE:
    link-patrol [global options] command [command options]
 
 VERSION:
-   v0.2
+   0.4
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -52,6 +49,7 @@ GLOBAL OPTIONS:
    --filepath value, -f value  path to the markdown file
    --timeout value, -t value   timeout for each HTTP request (default: 5s)
    --error-ok, -e              always exit with code 0 (default: false)
+   --json, -j                  output as JSON (default: false)
    --help, -h                  show help
    --version, -v               print the version
 ```
@@ -108,6 +106,25 @@ Set the `-e / --error-ok` flag to force the CLI to always exit with code 0.
 
 ```sh
 link-patrol -f examples/sample_1.md -e
+```
+
+### Print as JSON
+
+```sh
+link-patrol -f examples/sample_2.md -t 5s --json | jq
+```
+
+```json
+{
+  "location": "https://referencestyle.com",
+  "statusCode": 0,
+  "errMsg": "..."
+}
+{
+  "location": "https://referencestyle.com",
+  "statusCode": 0,
+  "errMsg": "..."
+}
 ```
 
 ### Check multiple files

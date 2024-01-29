@@ -11,6 +11,18 @@ import (
 var version string = "sentinel"
 
 func main() {
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-	src.Cli(w, version, os.Exit)
+	w := tabwriter.NewWriter(
+		os.Stdout,
+		0,
+		4,
+		4,
+		' ',
+		0,
+	)
+	defer w.Flush()
+	src.CLI(
+		w,
+		version,
+		os.Exit,
+	)
 }

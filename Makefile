@@ -11,6 +11,7 @@ init:
 .PHONY: lint
 lint:
 	@echo "Running lint"
+	@golines -w -m 92 cmd/* src/*
 	@golangci-lint run --fix
 	@go mod tidy
 	@prettier --write .

@@ -9,6 +9,9 @@ import (
 	"testing"
 	"text/tabwriter"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestReadMarkdown tests the readFile function
@@ -20,36 +23,26 @@ func TestReadMarkdown(t *testing.T) {
 
 	// Create a temporary file with test content
 	file, err := os.Create(filepath)
-	if err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
+	require.NoError(t, err, "failed to create test file")
 	defer func() {
 		// Close the file
 		file.Close()
 
 		// Remove the temporary file
 		err := os.Remove(filepath)
-		if err != nil {
-			t.Fatalf("failed to remove test file: %v", err)
-		}
+		require.NoError(t, err, "failed to remove test file")
 	}()
 
 	// Write the test content to the file
 	_, err = file.Write(expected)
-	if err != nil {
-		t.Fatalf("failed to write to test file: %v", err)
-	}
+	require.NoError(t, err, "failed to write to test file")
 
 	// Call the function under test
 	actual, err := readMarkdown(filepath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err, "unexpected error")
 
 	// Compare the actual result with the expected result
-	if string(actual) != string(expected) {
-		t.Errorf("unexpected result, got: %s, want: %s", string(actual), string(expected))
-	}
+	assert.Equal(t, string(expected), string(actual), "unexpected result")
 }
 
 // TestReadMarkdown_NonExistentFile tests the readFile function with a non-existent file
@@ -59,9 +52,7 @@ func TestReadMarkdown_NonExistentFile(t *testing.T) {
 	filepath := tmpDir + "/non-existent-file.md"
 	_, err := readMarkdown(filepath)
 
-	if err == nil {
-		t.Errorf("Expected an error, got no error")
-	}
+	require.Error(t, err, "non existent file should return an error")
 }
 
 // TestReadMarkdown_NonMarkdownFile tests the readFile function with a non-markdown file
@@ -72,114 +63,306 @@ func TestReadMarkdown_NonMarkdownFile(t *testing.T) {
 
 	// Create a temporary file
 	file, err := os.Create(filepath)
-	if err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
+	require.NoError(t, err, "failed to create test file")
 	defer func() {
 		// Close the file
 		file.Close()
 
 		// Remove the temporary file
 		err := os.Remove(filepath)
-		if err != nil {
-			t.Fatalf("failed to remove test file: %v", err)
-		}
+		require.NoError(t, err, "failed to remove test file")
 	}()
 
 	// Call the function under test
 	_, err = readMarkdown(filepath)
 
-	if err == nil {
-		t.Errorf("Expected an error, got no error")
+	// Check if an error was returned
+	assert.Error(t, err, "Expected an error for non-markdown file")
+}
+
+func TestFindLinks(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		markdown []byte
+		want     []string
+	}{
+		{
+			name: "Basic Functionality",
+			markdown: []byte(
+				"[link](http://example.com) ![image](https://example.com/image.jpg)",
+			),
+			want: []string{
+				"http://example.com",
+				"https://example.com/image.jpg",
+			},
+		},
+		{
+			name:     "No Links",
+			markdown: []byte("No links here."),
+			want:     []string{},
+		},
+		{
+			name: "Mixed Content",
+			markdown: []byte(
+				"# Heading\n\n[link](http://example.com)\n\n" +
+					"Text here\n\n![image](https://example.com/image.jpg)",
+			),
+			want: []string{
+				"http://example.com",
+				"https://example.com/image.jpg",
+			},
+		},
+		{
+			name: "Non-HTTP/S Links",
+			markdown: []byte(
+				`[http](http://example.com) [https](https://example.com)
+				[ftp](ftp://example.com) [mailto](mailto:example@example.com)`,
+			),
+			want: []string{"http://example.com", "https://example.com"},
+		},
+		{
+			name: "Nested Elements",
+			markdown: []byte(
+				"> [link](http://example.com)\n\n* ![image](https://example.com/image.jpg)",
+			),
+			want: []string{
+				"http://example.com",
+				"https://example.com/image.jpg",
+			},
+		},
+		{
+			name:     "Invalid Markdown Syntax",
+			markdown: []byte("[Invalid link](http://example.com"),
+			want:     []string{},
+		},
+		{
+			name: "Large Input",
+			markdown: []byte(
+				"[link1](http://example.com) ... [linkN](http://exampleN.com)",
+			),
+			want: []string{"http://example.com", "http://exampleN.com"},
+		},
+		{
+			name: "Special Characters in URLs",
+			markdown: []byte(
+				"[link](http://example.com?query=value&param=value)",
+			),
+			want: []string{"http://example.com?query=value&param=value"},
+		},
+
+		{
+			name:     "Unicode and Encoding",
+			markdown: []byte("[链接](http://例子.公司)"),
+			want:     []string{"http://例子.公司"},
+		},
+		{
+			name:     "Nil",
+			markdown: nil,
+			want:     []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := findLinks(tt.markdown)
+
+			// Treat nil slices as equivalent to empty slices
+			if len(got) == 0 && len(tt.want) == 0 {
+				return
+			}
+
+			assert.Equal(
+				t,
+				tt.want,
+				got,
+				"findLinks() did not return expected result",
+			)
+		})
 	}
 }
 
 // TestCheckLink_Success tests the checkUrl function with a successful HTTP request
 func TestCheckLink_Success(t *testing.T) {
 	t.Parallel()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	ts := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
 	defer ts.Close()
 
-	state := checkLink(ts.URL, 1*time.Second)
+	lr := checkLink(ts.Location, 1*time.Second)
 
-	if state.StatusCode != http.StatusOK || state.ErrMsg != "" {
-		t.Errorf(
-			"Expected status 200 with no error, got status %d with error '%s'",
-			state.StatusCode, state.ErrMsg)
-	}
+	assert.Equal(t, http.StatusOK, lr.StatusCode, "Status code should be 200")
+	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
 }
 
 // TestCheckLink_ClientError tests the checkUrl function with a client error
 func TestCheckLink_ClientError(t *testing.T) {
 	t.Parallel()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
+	ts := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}),
+	)
 	defer ts.Close()
 
-	state := checkLink(ts.URL, 1*time.Second)
+	lr := checkLink(ts.Location, 1*time.Second)
 
-	if state.StatusCode != http.StatusNotFound || state.ErrMsg != "" {
-		t.Errorf(
-			"Expected status 404 with no error, got status %d with error '%s'",
-			state.StatusCode, state.ErrMsg,
-		)
-	}
+	assert.Equal(
+		t,
+		http.StatusNotFound,
+		lr.StatusCode,
+		"Status code should be 404",
+	)
+	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
 }
 
 // TestCheckLink_ServerError tests the checkUrl function with a server error
 func TestCheckLink_ServerError(t *testing.T) {
 	t.Parallel()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
+	ts := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}),
+	)
 	defer ts.Close()
 
-	state := checkLink(ts.URL, 1*time.Second)
+	lr := checkLink(ts.Location, 1*time.Second)
 
-	if state.StatusCode != http.StatusInternalServerError || state.ErrMsg != "" {
-		t.Errorf(
-			"Expected status 500 with no error, got status %d with error '%s'",
-			state.StatusCode, state.ErrMsg,
-		)
-	}
+	assert.Equal(
+		t,
+		http.StatusInternalServerError,
+		lr.StatusCode,
+		"Status code should be 500",
+	)
+	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
 }
 
 // TestCheckLink_ConnectionError tests the checkUrl function with a connection error
 func TestCheckLink_ConnectionError(t *testing.T) {
 	t.Parallel()
-	state := checkLink("http://localhost:12345", 1*time.Second)
+	lr := checkLink("http://localhost:12345", 1*time.Second)
 
-	if state.ErrMsg == "" {
-		t.Errorf("Expected a connection error, got no error")
-	}
+	assert.Equal(t, 0, lr.StatusCode, "Status code should be 0")
+	assert.Contains(
+		t,
+		lr.ErrMsg,
+		"connection refused",
+		"Error message should contain 'connection refused'",
+	)
 }
 
 // TestCheckLink_InvalidLink tests the checkUrl function with an invalid URL format
 func TestCheckLink_InvalidLink(t *testing.T) {
 	t.Parallel()
-	state := checkLink(":%", 1*time.Second)
+	lr := checkLink(":%", 1*time.Second)
 
-	if state.ErrMsg == "" {
-		t.Errorf("Expected an invalid URL error, got no error")
-	}
+	assert.Equal(t, 0, lr.StatusCode, "Status code should be 0")
+	assert.Equal(t, lr.ErrMsg, "parse \":%\": missing protocol scheme")
 }
 
-// Test for printHeader function
-func TestPrintHeader(t *testing.T) {
+// Test for printFilepath function
+func TestPrintFilepath(t *testing.T) {
 	t.Parallel()
-	expectedOutput := "\nLink patrol\n===========\n\n"
+	expectedOutput := "Filepath: testfile.md\n\n"
 
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
-	printHeader(w)
-	w.Flush()
+	defer w.Flush()
 
-	if buf.String() != expectedOutput {
-		t.Errorf("printHeader() = %q, want %q", buf.String(), expectedOutput)
-	}
+	printFilepath(w, "testfile.md", false)
+	assert.Equal(
+		t,
+		expectedOutput,
+		buf.String(),
+		"printFilepath() did not return expected result",
+	)
+}
+
+// Test for printLinkRecordTab function
+func TestPrintLinkRecordTab(t *testing.T) {
+	t.Parallel()
+	linkRecord := linkRecord{"http://example.com", 200, "OK"}
+	expectedOutput := "- Location   : http://example.com\n" +
+		"  Status Code: 200\n" +
+		"  Error      : OK\n\n"
+
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
+	defer w.Flush()
+
+	_ = printLinkRecordTab(w, linkRecord)
+	assert.Equal(
+		t,
+		expectedOutput,
+		buf.String(),
+		"printLinkRecordTab() did not return expected result",
+	)
+}
+
+// Test for printLinkRecordJSON function
+func TestPrintLinkRecordJSON(t *testing.T) {
+	t.Parallel()
+	linkRecord := linkRecord{"http://example.com", 200, "OK"}
+	expectedOutput := "{\n" +
+		"  \"location\": \"http://example.com\",\n" +
+		"  \"statusCode\": 200,\n" +
+		"  \"errMsg\": \"OK\"\n" +
+		"}\n"
+
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
+	defer w.Flush()
+
+	_ = printLinkRecordJSON(w, linkRecord)
+	assert.Equal(
+		t,
+		expectedOutput,
+		buf.String(),
+		"printLinkRecordJSON() did not return expected result",
+	)
+}
+
+// Test for printLinkRecord function
+func TestPrintLinkRecord(t *testing.T) {
+	t.Parallel()
+	linkRecord := linkRecord{"http://example.com", 200, "OK"}
+	expectedOutput := "- Location   : http://example.com\n" +
+		"  Status Code: 200\n" +
+		"  Error      : OK\n\n"
+
+	var buf bytes.Buffer
+	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
+	defer w.Flush()
+
+	_ = printLinkRecord(w, linkRecord, false)
+	assert.Equal(
+		t,
+		expectedOutput,
+		buf.String(),
+		"printLinkRecord() did not return expected result",
+	)
+
+	// Test with JSON output
+	expectedOutput = "{\n" +
+		"  \"location\": \"http://example.com\",\n" +
+		"  \"statusCode\": 200,\n" +
+		"  \"errMsg\": \"OK\"\n" +
+		"}\n"
+
+	var buf2 bytes.Buffer
+	w2 := tabwriter.NewWriter(&buf2, 0, 0, 1, ' ', 0)
+	defer w2.Flush()
+
+	_ = printLinkRecord(w2, linkRecord, true)
+	assert.Equal(
+		t,
+		expectedOutput,
+		buf2.String(),
+		"printLinkRecord() did not return expected result",
+	)
 }
 
 func TestCheckLinks(t *testing.T) {
@@ -189,45 +372,47 @@ func TestCheckLinks(t *testing.T) {
 	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
 
 	// Create a test server that always returns a specific status code
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	ts := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
 	defer ts.Close()
 
 	// Create a list of test URLs
-	urls := []string{ts.URL + "/ok", ts.URL + "/invalid-url"}
+	urls := []string{ts.Location + "/ok", ts.Location + "/invalid-url"}
 
 	// Set the timeout and error flag for testing
 	timeout := time.Second
-	errOk := false
+	errOK := false
 
 	// Call the checkLinks function
-	_ = checkLinks(w, urls, timeout, errOk)
+	_ = checkLinks(w, urls, timeout, errOK, false)
 
 	// Flush the tabwriter.Writer to get the output
 	w.Flush()
 	output := buf.String()
 
 	// Verify the output
-	expectedOutput1 := "- URL        : " + ts.URL + "/ok\n" +
+	expectedOutput1 := "- Location   : " + ts.Location + "/ok\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n" +
-		"- URL        : " + ts.URL + "/invalid-url\n" +
+		"- Location   : " + ts.Location + "/invalid-url\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n"
-	expectedOutput2 := "- URL        : " + ts.URL + "/invalid-url\n" +
+	expectedOutput2 := "- Location   : " + ts.Location + "/invalid-url\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n" +
-		"- URL        : " + ts.URL + "/ok\n" +
+		"- Location   : " + ts.Location + "/ok\n" +
 		"  Status Code: 200\n" +
 		"  Error      : -\n\n"
 
-	if output != expectedOutput1 && output != expectedOutput2 {
-		t.Errorf(
-			"checkLinks() = %q, want %q or %q",
-			output, expectedOutput1, expectedOutput2,
-		)
-	}
+	assert.Contains(
+		t,
+		[]string{expectedOutput1, expectedOutput2},
+		output,
+		"checkLinks() did not return expected result",
+	)
 }
 
 func TestCheckLinks_RaisesError(t *testing.T) {
@@ -281,7 +466,7 @@ func TestCheckLinks_RaisesError(t *testing.T) {
 	createURLs := func(server *httptest.Server, paths map[string]int) []string {
 		var urls []string
 		for path := range paths {
-			urls = append(urls, server.URL+path)
+			urls = append(urls, server.Location+path)
 		}
 		return urls
 	}
@@ -289,7 +474,7 @@ func TestCheckLinks_RaisesError(t *testing.T) {
 	runCheckLinks := func(
 		w *tabwriter.Writer, urls []string, timeout time.Duration, ignoreErrors bool,
 	) bool {
-		err := checkLinks(w, urls, timeout, ignoreErrors)
+		err := checkLinks(w, urls, timeout, ignoreErrors, false)
 		return err != nil
 	}
 
@@ -303,68 +488,40 @@ func TestCheckLinks_RaisesError(t *testing.T) {
 			urls := createURLs(server, test.serverResponses)
 
 			w := tabwriter.NewWriter(log.Writer(), 0, 0, 0, ' ', 0)
-			errOccurred := runCheckLinks(w, urls, 5*time.Second, test.ignoreErrors)
+			errOccurred := runCheckLinks(
+				w,
+				urls,
+				5*time.Second,
+				test.ignoreErrors,
+			)
 
-			if errOccurred != test.expectError {
-				t.Errorf(
-					"checkLinks() error = %v, expectErr %v",
-					errOccurred,
-					test.expectError,
-				)
-			}
+			assert.Equal(t, test.expectError, errOccurred)
 		})
-	}
-}
-
-// Test for printUrlState function
-func TestPrintLinkRecord(t *testing.T) {
-	t.Parallel()
-	linkRecords := []linkRecord{
-		{"http://example.com", 200, "OK"},
-		{"http://testsite.com", 404, "Not Found"},
-	}
-
-	var buf bytes.Buffer
-	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
-
-	for _, linkRecord := range linkRecords {
-		printLinkRecord(w, linkRecord)
-	}
-	w.Flush()
-
-	expectedOutput := "- URL        : http://example.com\n" +
-		"  Status Code: 200\n" +
-		"  Error      : OK\n\n" +
-		"- URL        : http://testsite.com\n" +
-		"  Status Code: 404\n" +
-		"  Error      : Not Found\n\n"
-	actualOutput := buf.String()
-
-	if actualOutput != expectedOutput {
-		t.Errorf("printUrlState() = %q, want %q", actualOutput, expectedOutput)
 	}
 }
 
 // Benchmark for checkUrls
 func BenchmarkCheckUrls(b *testing.B) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/ok":
-			w.WriteHeader(http.StatusOK)
-		case "/notfound":
-			w.WriteHeader(http.StatusNotFound)
-		case "/error":
-			w.WriteHeader(http.StatusInternalServerError)
-		default:
-			w.WriteHeader(http.StatusBadRequest)
-		}
-	}))
+	ts := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/ok":
+				w.WriteHeader(http.StatusOK)
+			case "/notfound":
+				w.WriteHeader(http.StatusNotFound)
+			case "/error":
+				w.WriteHeader(http.StatusInternalServerError)
+			default:
+				w.WriteHeader(http.StatusBadRequest)
+			}
+		}),
+	)
 	defer ts.Close()
 
 	testUrls := []string{
-		ts.URL + "/ok",
-		ts.URL + "/notfound",
-		ts.URL + "/error",
+		ts.Location + "/ok",
+		ts.Location + "/notfound",
+		ts.Location + "/error",
 		"http://localhost:12345", // Connection error
 		":%",                     // Invalid URL
 	}
@@ -373,6 +530,6 @@ func BenchmarkCheckUrls(b *testing.B) {
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
 
 	for i := 0; i < b.N; i++ {
-		_ = checkLinks(w, testUrls, 1*time.Second, true)
+		_ = checkLinks(w, testUrls, 1*time.Second, true, false)
 	}
 }
