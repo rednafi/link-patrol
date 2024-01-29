@@ -79,9 +79,6 @@ By default, it'll exit with a non-zero code if any of the URLs is invalid or unr
 Here's how the output looks:
 
 ```txt
-Link patrol
-===========
-
 Filepath: examples/sample_1.md
 
 - URL        : https://reference.com
