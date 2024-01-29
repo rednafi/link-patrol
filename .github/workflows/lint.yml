@@ -28,11 +28,6 @@ jobs:
           version: v1.54
           args: --verbose --timeout 10m --fix=false --new-from-rev=HEAD~ --config=.golangci.yml
 
-      - name: gofumpt
-        run: |
-          go get mvdan.cc/gofumpt
-          gofumpt -l -w .
-
       - name: check-is-dirty
         run: |
           if [[ -n $(git status --porcelain) ]]; then
