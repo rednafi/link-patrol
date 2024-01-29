@@ -23,7 +23,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: go mod download
+        run: make init
 
       - name: Run tests
         run: make test
