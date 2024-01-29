@@ -12,6 +12,7 @@ init:
 lint:
 	@echo "Running lint"
 	@golines -w -m 92 cmd/* src/*
+	@gofumpt -w cmd/* src/*
 	@golangci-lint run --fix
 	@go mod tidy
 	@prettier --write .

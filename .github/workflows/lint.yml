@@ -28,10 +28,10 @@ jobs:
           version: v1.54
           args: --verbose --timeout 10m --fix=false --new-from-rev=HEAD~ --config=.golangci.yml
 
-      - name: Other linters
+      - name: gofumpt
         run: |
-          make init
-          make lint
+          go get mvdan.cc/gofumpt
+          gofumpt -l -w .
 
       - name: check-is-dirty
         run: |
