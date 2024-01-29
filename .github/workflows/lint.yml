@@ -30,6 +30,7 @@ jobs:
 
       - name: Other linters
         run: |
+          make init
           make lint
 
       - name: check-is-dirty
