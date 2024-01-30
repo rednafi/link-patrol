@@ -81,31 +81,32 @@ Here's how the output looks:
 ```txt
 Filepath: examples/sample_1.md
 
-- URL        : https://reference.com
+- Location   : https://reference.com
   Status Code: 403
   Error      : -
 
-- URL        : https://example.com
+- Location   : https://example.com
   Status Code: 200
   Error      : -
 
-- URL        : https://gen.xyz/
+- Location   : https://gen.xyz/
   Status Code: 200
   Error      : -
 
-2024/01/20 03:41:55 Some URLs are invalid or unreachable
-exit status 1
+2024/01/30 11:40:17 one or more URLs have error status codes
 ```
 
 ### Ignore errors
 
-Set the `-e / --error-ok` flag to force the CLI to always exit with code 0.
+Set the `--error-ok / -e` flag to force the CLI to always exit with code 0:
 
 ```sh
 link-patrol -f examples/sample_1.md -e
 ```
 
 ### Print as JSON
+
+Use the `--json / -j` flag to format the output as JSON:
 
 ```sh
 link-patrol -f examples/sample_2.md -t 5s --json | jq
@@ -126,7 +127,7 @@ link-patrol -f examples/sample_2.md -t 5s --json | jq
 
 ### Check multiple files
 
-Do some shell-foo:
+Do some shell-fu:
 
 ```sh
 find examples -name '*.md' -exec link-patrol -f {} -t 4s -e \;
