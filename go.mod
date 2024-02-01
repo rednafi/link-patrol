@@ -4,13 +4,16 @@ go 1.21.6
 
 require (
 	github.com/golangci/golangci-lint v1.55.2
-	github.com/segmentio/golines v0.12.2
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.27.1 // app dep
 	github.com/yuin/goldmark v1.6.0 // app dep
-	honnef.co/go/tools v0.4.6
-	mvdan.cc/gofumpt v0.5.0
+	honnef.co/go/tools v0.4.6 // indirect
+	mvdan.cc/gofumpt v0.5.0 // indirect
 )
+
+require golang.org/x/tools v0.17.0 // indirect
+
+require github.com/segmentio/golines v0.12.2
 
 require (
 	4d63.com/gocheckcompilerdirectives v1.2.1 // indirect
@@ -194,7 +197,6 @@ require (
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/term v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect

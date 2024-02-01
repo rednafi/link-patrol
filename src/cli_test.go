@@ -77,7 +77,7 @@ func TestReadMarkdown_NonMarkdownFile(t *testing.T) {
 	_, err = readMarkdown(filepath)
 
 	// Check if an error was returned
-	assert.Error(t, err, "Expected an error for non-markdown file")
+	require.Error(t, err, "Expected an error for non-markdown file")
 }
 
 func TestFindLinks(t *testing.T) {
@@ -259,8 +259,8 @@ func TestCheckLink_InvalidLink(t *testing.T) {
 	t.Parallel()
 	lr := checkLink(":%", 1*time.Second)
 
-	assert.Equal(t, 0, lr.StatusCode, "Status code should be 0")
-	assert.Equal(t, lr.Message, "parse \":%\": missing protocol scheme")
+	assert.Equal(t, 0, "Status code should be 0", lr.StatusCode)
+	assert.Equal(t, "parse \":%\": missing protocol scheme", lr.Message)
 }
 
 // Test for printFilepath function

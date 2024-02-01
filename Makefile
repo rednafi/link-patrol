@@ -12,9 +12,7 @@ init:
 lint:
 	@echo "Running lint"
 	@golines -w -m 92 cmd/* src/*
-	@gofumpt -w cmd/* src/*
 	@golangci-lint run --fix
-	@go mod tidy
 	@prettier --write .
 
 
@@ -39,5 +37,11 @@ bench:
 .PHONY: clean
 clean:
 	@echo "Cleaning up"
+	@go clean -x
 	@go clean
+	@go clean -testcache
+	@go clean -cache
+	@go clean -modcache
+	@go clean -i
+	@go clean -r
 	@rm -rf ./bin
