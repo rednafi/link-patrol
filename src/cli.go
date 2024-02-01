@@ -76,7 +76,8 @@ func findLinks(markdown []byte) ([]string, error) {
 type linkRecord struct {
 	Location   string `json:"location"`
 	StatusCode int    `json:"statusCode"`
-	ErrMsg     string `json:"errMsg"`
+	OK         bool   `json:"ok"`
+	Message    string `json:"message"`
 }
 
 // checkLink makes an HTTP request to url using the provided timeout.
@@ -94,23 +95,34 @@ func checkLink(url string, timeout time.Duration) linkRecord {
 			return linkRecord{
 				Location:   url,
 				StatusCode: 0,
-				ErrMsg:     fmt.Sprintf("Request timed out after %s", timeout),
+				OK:         false,
+				Message:    fmt.Sprintf("Request timed out after %s", timeout),
 			}
 		}
 
 		return linkRecord{
 			Location:   url,
 			StatusCode: 0,
-			ErrMsg:     err.Error(),
+			OK:         false,
+			Message:    err.Error(),
 		}
 	}
 
 	defer resp.Body.Close()
 
+	statusCode := resp.StatusCode
+	statusText := http.StatusText(statusCode)
+
+	OK := true
+	if statusCode >= 400 {
+		OK = false
+	}
+
 	return linkRecord{
 		Location:   url,
 		StatusCode: resp.StatusCode,
-		ErrMsg:     "",
+		OK:         OK,
+		Message:    statusText,
 	}
 }
 
@@ -135,7 +147,8 @@ func printLinkRecordJSON(w io.Writer, lr linkRecord) error {
 func printLinkRecordTab(w io.Writer, lr linkRecord) error {
 	tpl := `- Location   : {{.Location}}
   Status Code: {{if eq .StatusCode 0}}-{{else}}{{.StatusCode}}{{end}}
-  Error      : {{if .ErrMsg}}{{.ErrMsg}}{{else}}-{{end}}
+  OK         : {{.OK}}
+  Message    : {{if .Message}}{{.Message}}{{else}}-{{end}}
 
 `
 	t, err := template.New("record").Parse(tpl)

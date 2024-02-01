@@ -25,5 +25,17 @@ jobs:
       - name: Install dependencies
         run: make init
 
+      - name: Lint
+        run: make lint
+
+      - name: check-is-dirty
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Detected uncommitted changes."
+            git status
+            git diff
+            exit 1
+          fi
+
       - name: Run tests
         run: make test
