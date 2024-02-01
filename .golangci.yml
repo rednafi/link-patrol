@@ -2,8 +2,11 @@ linters:
   enable:
     - gofmt
     - gofumpt
+    - goimports
     - nolintlint
     - lll
+    - staticcheck
+    - testifylint
 
 issues:
   max-issues-per-linter: 0

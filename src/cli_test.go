@@ -77,7 +77,7 @@ func TestReadMarkdown_NonMarkdownFile(t *testing.T) {
 	_, err = readMarkdown(filepath)
 
 	// Check if an error was returned
-	assert.Error(t, err, "Expected an error for non-markdown file")
+	require.Error(t, err, "Expected an error for non-markdown file")
 }
 
 func TestFindLinks(t *testing.T) {
@@ -195,9 +195,8 @@ func TestCheckLink_Success(t *testing.T) {
 	lr := checkLink(ts.URL, 1*time.Second)
 
 	assert.Equal(t, http.StatusOK, lr.StatusCode, "Status code should be 200")
-	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
+	assert.Equal(t, "OK", lr.Message, "Error message should be 'OK'")
 }
-
 
 // TestCheckLink_ClientError tests the checkUrl function with a client error
 func TestCheckLink_ClientError(t *testing.T) {
@@ -217,7 +216,7 @@ func TestCheckLink_ClientError(t *testing.T) {
 		lr.StatusCode,
 		"Status code should be 404",
 	)
-	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
+	assert.Equal(t, "Not Found", lr.Message)
 }
 
 // TestCheckLink_ServerError tests the checkUrl function with a server error
@@ -238,7 +237,7 @@ func TestCheckLink_ServerError(t *testing.T) {
 		lr.StatusCode,
 		"Status code should be 500",
 	)
-	assert.Empty(t, lr.ErrMsg, "Error message should be empty")
+	assert.Equal(t, "Internal Server Error", lr.Message)
 }
 
 // TestCheckLink_ConnectionError tests the checkUrl function with a connection error
@@ -249,7 +248,7 @@ func TestCheckLink_ConnectionError(t *testing.T) {
 	assert.Equal(t, 0, lr.StatusCode, "Status code should be 0")
 	assert.Contains(
 		t,
-		lr.ErrMsg,
+		lr.Message,
 		"connection refused",
 		"Error message should contain 'connection refused'",
 	)
@@ -261,7 +260,7 @@ func TestCheckLink_InvalidLink(t *testing.T) {
 	lr := checkLink(":%", 1*time.Second)
 
 	assert.Equal(t, 0, lr.StatusCode, "Status code should be 0")
-	assert.Equal(t, lr.ErrMsg, "parse \":%\": missing protocol scheme")
+	assert.Equal(t, "parse \":%\": missing protocol scheme", lr.Message)
 }
 
 // Test for printFilepath function
@@ -285,10 +284,11 @@ func TestPrintFilepath(t *testing.T) {
 // Test for printLinkRecordTab function
 func TestPrintLinkRecordTab(t *testing.T) {
 	t.Parallel()
-	linkRecord := linkRecord{"http://example.com", 200, "OK"}
+	linkRecord := linkRecord{"http://example.com", 200, true, "OK"}
 	expectedOutput := "- Location   : http://example.com\n" +
 		"  Status Code: 200\n" +
-		"  Error      : OK\n\n"
+		"  OK         : true\n" +
+		"  Message    : OK\n\n"
 
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
@@ -306,11 +306,12 @@ func TestPrintLinkRecordTab(t *testing.T) {
 // Test for printLinkRecordJSON function
 func TestPrintLinkRecordJSON(t *testing.T) {
 	t.Parallel()
-	linkRecord := linkRecord{"http://example.com", 200, "OK"}
+	linkRecord := linkRecord{"http://example.com", 200, true, "OK"}
 	expectedOutput := "{\n" +
 		"  \"location\": \"http://example.com\",\n" +
 		"  \"statusCode\": 200,\n" +
-		"  \"errMsg\": \"OK\"\n" +
+		"  \"ok\": true,\n" +
+		"  \"message\": \"OK\"\n" +
 		"}\n"
 
 	var buf bytes.Buffer
@@ -329,10 +330,11 @@ func TestPrintLinkRecordJSON(t *testing.T) {
 // Test for printLinkRecord function
 func TestPrintLinkRecord(t *testing.T) {
 	t.Parallel()
-	linkRecord := linkRecord{"http://example.com", 200, "OK"}
+	linkRecord := linkRecord{"http://example.com", 200, true, "OK"}
 	expectedOutput := "- Location   : http://example.com\n" +
 		"  Status Code: 200\n" +
-		"  Error      : OK\n\n"
+		"  OK         : true\n" +
+		"  Message    : OK\n\n"
 
 	var buf bytes.Buffer
 	w := tabwriter.NewWriter(&buf, 0, 0, 1, ' ', 0)
@@ -350,7 +352,8 @@ func TestPrintLinkRecord(t *testing.T) {
 	expectedOutput = "{\n" +
 		"  \"location\": \"http://example.com\",\n" +
 		"  \"statusCode\": 200,\n" +
-		"  \"errMsg\": \"OK\"\n" +
+		"  \"ok\": true,\n" +
+		"  \"message\": \"OK\"\n" +
 		"}\n"
 
 	var buf2 bytes.Buffer
@@ -371,6 +374,7 @@ func TestCheckLinks(t *testing.T) {
 	// Create a test tabwriter.Writer
 	buf := new(bytes.Buffer)
 	w := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
+	defer w.Flush()
 
 	// Create a test server that always returns a specific status code
 	ts := httptest.NewServer(
@@ -386,27 +390,30 @@ func TestCheckLinks(t *testing.T) {
 	// Set the timeout and error flag for testing
 	timeout := time.Second
 	errOK := false
+	asJSON := false
 
 	// Call the checkLinks function
-	_ = checkLinks(w, urls, timeout, errOK, false)
+	_ = checkLinks(w, urls, timeout, errOK, asJSON)
 
-	// Flush the tabwriter.Writer to get the output
-	w.Flush()
 	output := buf.String()
 
 	// Verify the output
 	expectedOutput1 := "- Location   : " + ts.URL + "/ok\n" +
 		"  Status Code: 200\n" +
-		"  Error      : -\n\n" +
+		"  OK         : true\n" +
+		"  Message    : OK\n\n" +
 		"- Location   : " + ts.URL + "/invalid-url\n" +
 		"  Status Code: 200\n" +
-		"  Error      : -\n\n"
+		"  OK         : true\n" +
+		"  Message    : OK\n\n"
 	expectedOutput2 := "- Location   : " + ts.URL + "/invalid-url\n" +
 		"  Status Code: 200\n" +
-		"  Error      : -\n\n" +
+		"  OK         : true\n" +
+		"  Message    : OK\n\n" +
 		"- Location   : " + ts.URL + "/ok\n" +
 		"  Status Code: 200\n" +
-		"  Error      : -\n\n"
+		"  OK         : true\n" +
+		"  Message    : OK\n\n"
 
 	assert.Contains(
 		t,
