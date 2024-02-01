@@ -259,7 +259,7 @@ func TestCheckLink_InvalidLink(t *testing.T) {
 	t.Parallel()
 	lr := checkLink(":%", 1*time.Second)
 
-	assert.Equal(t, 0, "Status code should be 0", lr.StatusCode)
+	assert.Equal(t, 0, lr.StatusCode, "Status code should be 0")
 	assert.Equal(t, "parse \":%\": missing protocol scheme", lr.Message)
 }
 
