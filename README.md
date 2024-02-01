@@ -40,7 +40,7 @@ USAGE:
    link-patrol [global options] command [command options]
 
 VERSION:
-   0.4
+   0.5
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -83,17 +83,21 @@ Filepath: examples/sample_1.md
 
 - Location   : https://reference.com
   Status Code: 403
-  Error      : -
+  OK         : false
+  Message    : Forbidden
 
 - Location   : https://example.com
   Status Code: 200
-  Error      : -
+  OK         : true
+  Message    : OK
 
 - Location   : https://gen.xyz/
-  Status Code: 200
-  Error      : -
+  Status Code: -
+  OK         : false
+  Message    : Request timed out after 2s
 
-2024/01/30 11:40:17 one or more URLs have error status codes
+2024/02/01 21:19:21 one or more URLs have error status codes
+exit status 1
 ```
 
 ### Ignore errors
@@ -116,12 +120,20 @@ link-patrol -f examples/sample_2.md -t 5s --json | jq
 {
   "location": "https://referencestyle.com",
   "statusCode": 0,
-  "errMsg": "..."
+  "ok": false,
+  "message": "... no such host"
 }
 {
-  "location": "https://referencestyle.com",
-  "statusCode": 0,
-  "errMsg": "..."
+  "location": "https://example.com",
+  "statusCode": 200,
+  "ok": true,
+  "message": "OK"
+}
+{
+  "location": "https://example.com/image.jpg",
+  "statusCode": 404,
+  "ok": false,
+  "message": "Not Found"
 }
 ```
 
