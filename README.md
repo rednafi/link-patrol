@@ -40,7 +40,7 @@ USAGE:
    link-patrol [global options] command [command options]
 
 VERSION:
-   0.5
+   0.6
 
 COMMANDS:
    help, h  Shows a list of commands or help for one command
@@ -50,6 +50,9 @@ GLOBAL OPTIONS:
    --timeout value, -t value   timeout for each HTTP request (default: 5s)
    --error-ok, -e              always exit with code 0 (default: false)
    --json, -j                  output as JSON (default: false)
+   --max-retries value         maximum number of retries for each URL (default: 1)
+   --start-backoff value       initial backoff duration for retries (default: 1s)
+   --max-backoff value         maximum backoff duration for retries (default: 4s)
    --help, -h                  show help
    --version, -v               print the version
 ```
@@ -85,18 +88,21 @@ Filepath: examples/sample_1.md
   Status Code: 403
   OK         : false
   Message    : Forbidden
+  Attempt    : 1
 
 - Location   : https://example.com
   Status Code: 200
   OK         : true
   Message    : OK
+  Attempt    : 1
 
 - Location   : https://gen.xyz/
-  Status Code: -
-  OK         : false
-  Message    : Request timed out after 2s
+  Status Code: 200
+  OK         : true
+  Message    : OK
+  Attempt    : 1
 
-2024/02/01 21:19:21 one or more URLs have error status codes
+2024/02/03 05:24:43 one or more URLs have error status codes
 exit status 1
 ```
 
@@ -135,6 +141,39 @@ link-patrol -f examples/sample_2.md -t 5s --json | jq
   "ok": false,
   "message": "Not Found"
 }
+```
+
+### Retry with random jitters
+
+Use the `--max-retries`, `--start-backoff`, and `--max-backoff` to configure auto retries:
+
+```sh
+link-patrol -f examples/sample_1.md -t 1s --max-retries 3 --max-backoff 3s
+```
+
+```txt
+Filepath: examples/sample_1.md
+
+- Location   : https://example.com
+  Status Code: 200
+  OK         : true
+  Message    : OK
+  Attempt    : 1
+
+- Location   : https://gen.xyz/
+  Status Code: 200
+  OK         : true
+  Message    : OK
+  Attempt    : 2
+
+- Location   : https://reference.com
+  Status Code: 403
+  OK         : false
+  Message    : Forbidden
+  Attempt    : 3
+
+2024/02/03 05:23:21 one or more URLs have error status codes
+exit status 1
 ```
 
 ### Check multiple files

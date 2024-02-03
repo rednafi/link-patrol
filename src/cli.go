@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -78,51 +79,75 @@ type linkRecord struct {
 	StatusCode int    `json:"statusCode"`
 	OK         bool   `json:"ok"`
 	Message    string `json:"message"`
+	Attempt    int    `json:"attempt"`
 }
 
-// checkLink makes an HTTP request to url using the provided timeout.
-// Returns a linkRecord with the result.
-func checkLink(url string, timeout time.Duration) linkRecord {
+func checkLink(
+	url string,
+	timeout time.Duration,
+	maxRetries int,
+	startBackoff time.Duration,
+	maxBackoff time.Duration,
+) linkRecord {
 	client := &http.Client{
 		Timeout: timeout,
 	}
 
-	resp, err := client.Get(url)
-	if err != nil {
-		// Check for timeout error.
-		var netErr net.Error
-		if errors.As(err, &netErr) && netErr.Timeout() {
+	var resp *http.Response
+	var err error
+
+	// This should be synchronous, retrying concurrently doesn't make sense.
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		resp, err = client.Get(url)
+		if err == nil && resp.StatusCode < 400 {
+			defer resp.Body.Close()
 			return linkRecord{
 				Location:   url,
-				StatusCode: 0,
-				OK:         false,
-				Message:    fmt.Sprintf("Request timed out after %s", timeout),
+				StatusCode: resp.StatusCode,
+				OK:         true,
+				Message:    http.StatusText(resp.StatusCode),
+				Attempt:    attempt,
 			}
 		}
 
-		return linkRecord{
-			Location:   url,
-			StatusCode: 0,
-			OK:         false,
-			Message:    err.Error(),
+		if attempt < maxRetries {
+			backoff := startBackoff * 2
+
+			// Apply jitter by adding a random amount of milliseconds
+			jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+			actualBackoff := backoff + jitter
+
+			// Cap the backoff time to a maximum value
+			if actualBackoff > maxBackoff {
+				actualBackoff = maxBackoff
+			}
+
+			time.Sleep(actualBackoff)
 		}
 	}
 
-	defer resp.Body.Close()
+	statusText := "Unknown error"
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			statusText = "Request timed out after " + timeout.String()
+		} else {
+			statusText = err.Error()
+		}
+	} else if resp != nil {
+		statusText = http.StatusText(resp.StatusCode)
+	}
 
-	statusCode := resp.StatusCode
-	statusText := http.StatusText(statusCode)
-
-	OK := true
-	if statusCode >= 400 {
-		OK = false
+	statusCode := 0
+	if resp != nil {
+		statusCode = resp.StatusCode
 	}
 
 	return linkRecord{
 		Location:   url,
-		StatusCode: resp.StatusCode,
-		OK:         OK,
+		StatusCode: statusCode,
+		OK:         false,
 		Message:    statusText,
+		Attempt:    maxRetries,
 	}
 }
 
@@ -149,6 +174,7 @@ func printLinkRecordTab(w io.Writer, lr linkRecord) error {
   Status Code: {{if eq .StatusCode 0}}-{{else}}{{.StatusCode}}{{end}}
   OK         : {{.OK}}
   Message    : {{if .Message}}{{.Message}}{{else}}-{{end}}
+  Attempt    : {{.Attempt}}
 
 `
 	t, err := template.New("record").Parse(tpl)
@@ -176,6 +202,9 @@ func checkLinks(
 	w io.Writer,
 	urls []string,
 	timeout time.Duration,
+	maxRetries int,
+	startBackoff time.Duration,
+	maxBackoff time.Duration,
 	errOK bool,
 	asJSON bool,
 ) error {
@@ -191,7 +220,7 @@ func checkLinks(
 		go func(url string) {
 			defer wg.Done()
 
-			result := checkLink(url, timeout)
+			result := checkLink(url, timeout, maxRetries, startBackoff, maxBackoff)
 
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -221,6 +250,9 @@ func orchestrate(
 	w io.Writer,
 	filepath string,
 	timeout time.Duration,
+	maxRetries int,
+	startBackoff time.Duration,
+	maxBackoff time.Duration,
 	errOK bool,
 	asJSON bool,
 ) {
@@ -236,7 +268,9 @@ func orchestrate(
 		log.Fatal(err)
 	}
 
-	if err := checkLinks(w, links, timeout, errOK, asJSON); err != nil {
+	if err := checkLinks(
+		w, links, timeout, maxRetries, startBackoff, maxBackoff, errOK, asJSON,
+	); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -281,12 +315,30 @@ func CLI(w io.Writer, version string, exitFunc func(int)) {
 			Value:   false,
 			Usage:   "output as JSON",
 		},
+		&cli.IntFlag{
+			Name:  "max-retries",
+			Value: 1,
+			Usage: "maximum number of retries for each URL",
+		},
+		&cli.DurationFlag{
+			Name:  "start-backoff",
+			Value: 1 * time.Second,
+			Usage: "initial backoff duration for retries",
+		},
+		&cli.DurationFlag{
+			Name:  "max-backoff",
+			Value: 4 * time.Second,
+			Usage: "maximum backoff duration for retries",
+		},
 	}
 
 	// Main Action
 	app.Action = func(c *cli.Context) error {
 		filepath := c.String("filepath")
 		timeout := c.Duration("timeout")
+		maxRetries := c.Int("max-retries")
+		startBackoff := c.Duration("start-backoff")
+		maxBackoff := c.Duration("max-backoff")
 		errOK := c.Bool("error-ok")
 		asJSON := c.Bool("json")
 
@@ -296,8 +348,29 @@ func CLI(w io.Writer, version string, exitFunc func(int)) {
 			return fmt.Errorf("filepath is required")
 		}
 
+		// startBackoff should be at least 1ms
+		if startBackoff < time.Millisecond {
+			return fmt.Errorf("start-backoff should be at least 1ms")
+		}
+
+		// maxBackoff must be greater than or equal to startBackoff
+		if maxBackoff < startBackoff {
+			return fmt.Errorf(
+				"max-backoff should be greater than or equal to start-backoff",
+			)
+		}
+
 		// Proceed with orchestration as filepath is provided
-		orchestrate(w, filepath, timeout, errOK, asJSON)
+		orchestrate(
+			w,
+			filepath,
+			timeout,
+			maxRetries,
+			startBackoff,
+			maxBackoff,
+			errOK,
+			asJSON,
+		)
 		return nil
 	}
 
