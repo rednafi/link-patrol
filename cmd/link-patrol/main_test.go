@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -11,7 +12,6 @@ import (
 )
 
 func TestCLIHelpCommand(t *testing.T) {
-	t.Parallel()
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -31,13 +31,13 @@ func TestCLIHelpCommand(t *testing.T) {
 
 	// Verify the output contains the usage
 	output := out.String()
+	fmt.Println(output)
 	if !strings.Contains(output, "USAGE:") {
 		t.Errorf("Expected usage in output, got %s", output)
 	}
 }
 
 func TestCLIVersionCommand(t *testing.T) {
-	t.Parallel()
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -63,7 +63,6 @@ func TestCLIVersionCommand(t *testing.T) {
 }
 
 func TestCLIInvalidCommand(t *testing.T) {
-	t.Parallel()
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
