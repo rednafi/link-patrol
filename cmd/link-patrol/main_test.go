@@ -177,4 +177,3 @@ func TestCLIPrintJSON(t *testing.T) {
 	assert.Contains(t, output, `"statusCode": 0`)
 	assert.Contains(t, output, `"ok": false`)
 }
-
