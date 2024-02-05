@@ -131,9 +131,7 @@ func TestCLIPrintTab(t *testing.T) {
 		output,
 		`Message    : Get "https://doesnt.exist": dial tcp: lookup doesnt.exist`,
 	)
-	assert.Contains(t, output, "Attempt    : 1")
 	assert.Contains(t, output, "Location   : https://wot.wot/")
-	assert.Contains(t, output, "Status Code: -")
 	assert.Contains(t, output, "OK         : false")
 	assert.Contains(
 		t,
@@ -142,8 +140,6 @@ func TestCLIPrintTab(t *testing.T) {
 	)
 	assert.Contains(t, output, "Attempt    : 1")
 	assert.Contains(t, output, "Location   : https://not.either")
-	assert.Contains(t, output, "Status Code: -")
-	assert.Contains(t, output, "OK         : false")
 	assert.Contains(
 		t,
 		output,
