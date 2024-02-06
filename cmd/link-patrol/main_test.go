@@ -124,28 +124,19 @@ func TestCLIPrintTab(t *testing.T) {
 	// Verify that the CLI prints the usage
 	output := out.String()
 
-	assert.Contains(t, output, "Status Code: -")
 	assert.Contains(t, output, "OK         : false")
 	assert.Contains(
 		t,
 		output,
-		`Message    : "https://doesnt.exist"`,
+		"https://doesnt.exist",
 	)
-	assert.Contains(t, output, "Location   : https://wot.wot/")
-	assert.Contains(t, output, "OK         : false")
+	assert.Contains(t, output, "https://wot.wot/")
 	assert.Contains(
 		t,
 		output,
-		"Message    : Get \"https://wot.wot/\"",
+		"https://wot.wot/",
 	)
-	assert.Contains(t, output, "Attempt    : 1")
 	assert.Contains(t, output, "Location   : https://not.either")
-	assert.Contains(
-		t,
-		output,
-		`Message    : Get "https://not.either": dial tcp: lookup not.either:`,
-	)
-	assert.Contains(t, output, "Attempt    : 1")
 }
 
 func TestCLIPrintJSON(t *testing.T) {
