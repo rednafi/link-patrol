@@ -603,7 +603,7 @@ func TestCheckLinks_Retry(t *testing.T) {
 }
 
 // Test CLI e2e
-func MakeMockMdFile() string {
+func MakeMockMarkdownFile() string {
 	// Create sample markdown file in system's temp directory with prefix "sample_1"
 	// The actual filename will have a unique suffix to ensure uniqueness
 	file, err := os.CreateTemp("", "sample_1*.md")
@@ -631,7 +631,24 @@ This is a footnote[^1] URL.
 	return file.Name()
 }
 
-func TestCLIHelpCommand(t *testing.T) {
+func MakeMockOtherFile() string {
+	// Create sample markdown file in system's temp directory with prefix "sample_2"
+	// The actual filename will have a unique suffix to ensure uniqueness
+	file, err := os.CreateTemp("", "sample_2.notmd")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	// Write some content to the file
+	_, err = file.WriteString(`This is an [embedded](https://doesnt.exist) URL.`)
+	if err != nil {
+		panic(err)
+	}
+	return file.Name()
+}
+
+func TestCLI_HelpCommand(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -653,7 +670,7 @@ func TestCLIHelpCommand(t *testing.T) {
 	assert.Contains(t, output, "USAGE:")
 }
 
-func TestCLIVersionCommand(t *testing.T) {
+func TestCLI_VersionCommand(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -674,7 +691,7 @@ func TestCLIVersionCommand(t *testing.T) {
 	assert.Contains(t, output, "0.1.0-test")
 }
 
-func TestCLIInvalidCommand(t *testing.T) {
+func TestCLI_InvalidCommand(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -695,12 +712,12 @@ func TestCLIInvalidCommand(t *testing.T) {
 	assert.Contains(t, output, "USAGE:")
 }
 
-func TestCLIPrintTab(t *testing.T) {
+func TestCLI_PrintTab(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
 	// Create a sample markdown file
-	filePath := MakeMockMdFile()
+	filePath := MakeMockMarkdownFile()
 
 	// Capture the output by using a bytes.Buffer
 	var out bytes.Buffer
@@ -732,12 +749,12 @@ func TestCLIPrintTab(t *testing.T) {
 	assert.Contains(t, output, "Location   : https://not.either")
 }
 
-func TestCLIPrintJSON(t *testing.T) {
+func TestCLI_PrintJSON(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
 	// Create a sample markdown file
-	filePath := MakeMockMdFile()
+	filePath := MakeMockMarkdownFile()
 
 	// Capture the output by using a bytes.Buffer
 	var out bytes.Buffer
@@ -758,7 +775,7 @@ func TestCLIPrintJSON(t *testing.T) {
 	assert.Contains(t, output, `"ok": false`)
 }
 
-func TestCLIMissingFile(t *testing.T) {
+func TestCLI_MarkdownDoesNotExist(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -779,7 +796,7 @@ func TestCLIMissingFile(t *testing.T) {
 	assert.Contains(t, output, "failed to read file: open doesntexist.md:")
 }
 
-func TestCLINoMarkdownFile(t *testing.T) {
+func TestCLI_MarkdownIsNotProvided(t *testing.T) {
 	// Mock os.Exit to prevent the test runner from exiting
 	mockExit := func(code int) {}
 
@@ -798,6 +815,29 @@ func TestCLINoMarkdownFile(t *testing.T) {
 	// Verify that the CLI prints the usage
 	output := out.String()
 	assert.Contains(t, output, "USAGE:")
+}
+
+func TestCLI_FileExistsButIsNotMarkdown(t *testing.T) {
+	// Mock os.Exit to prevent the test runner from exiting
+	mockExit := func(code int) {}
+
+	filePath := MakeMockOtherFile()
+
+	// Capture the output by using a bytes.Buffer
+	var out bytes.Buffer
+	w := tabwriter.NewWriter(&out, 0, 4, 4, ' ', 0)
+	defer w.Flush()
+
+	// Simulate executing -f and -j flags
+	args := os.Args[0:1] // Keep the program name only
+	args = append(args, "-f", filePath)
+	os.Args = args
+
+	CLI(w, "0.1.0-test", mockExit)
+
+	// Verify that the CLI prints the usage
+	output := out.String()
+	assert.Contains(t, output, "file is not a markdown file")
 }
 
 // Benchmark for checkUrls
