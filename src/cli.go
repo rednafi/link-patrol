@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -255,23 +254,27 @@ func orchestrate(
 	maxBackoff time.Duration,
 	errOK bool,
 	asJSON bool,
+	exitFunc func(int),
 ) {
 	printFilepath(w, filepath, asJSON)
 
 	markdown, err := readMarkdown(filepath)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(w, err)
+		exitFunc(1)
 	}
 
 	links, err := findLinks(markdown)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(w, err)
+		exitFunc(1)
 	}
 
 	if err := checkLinks(
 		w, links, timeout, maxRetries, startBackoff, maxBackoff, errOK, asJSON,
 	); err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(w, err)
+		exitFunc(1)
 	}
 }
 
@@ -370,6 +373,7 @@ func CLI(w io.Writer, version string, exitFunc func(int)) {
 			maxBackoff,
 			errOK,
 			asJSON,
+			exitFunc,
 		)
 		return nil
 	}
