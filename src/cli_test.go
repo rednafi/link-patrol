@@ -840,6 +840,27 @@ func TestCLI_FileExistsButIsNotMarkdown(t *testing.T) {
 	assert.Contains(t, output, "file is not a markdown file")
 }
 
+func TestCLI_ErrorOkExitsWithCodeZero(t *testing.T) {
+	// Create a sample markdown file
+	filePath := MakeMockMarkdownFile()
+
+	// Capture the output by using a bytes.Buffer
+	var out bytes.Buffer
+	w := tabwriter.NewWriter(&out, 0, 4, 4, ' ', 0)
+	defer w.Flush()
+
+	// Simulate executing -f and -e flags
+	args := os.Args[0:1] // Keep the program name only
+	args = append(args, "-f", filePath, "-e", "-t", "5s")
+	os.Args = args
+
+	CLI(tabwriter.NewWriter(w, 0, 4, 4, ' ', 0), "0.1.0-test", os.Exit)
+
+	// Verify that the CLI exits with code 0. This means the program did not
+	// encounter any errors
+	assert.Contains(t, out.String(), "OK         : false\n")
+}
+
 // Benchmark for checkUrls
 func BenchmarkCheckUrls(b *testing.B) {
 	ts := httptest.NewServer(
