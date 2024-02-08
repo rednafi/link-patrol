@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -851,13 +852,14 @@ func TestCLI_ErrorOkExitsWithCodeZero(t *testing.T) {
 
 	// Simulate executing -f and -e flags
 	args := os.Args[0:1] // Keep the program name only
-	args = append(args, "-f", filePath, "-e", "-t", "5s")
+	args = append(args, "-f", filePath)
 	os.Args = args
 
-	CLI(tabwriter.NewWriter(w, 0, 4, 4, ' ', 0), "0.1.0-test", os.Exit)
+	CLI(w, "0.1.0-test", os.Exit)
 
 	// Verify that the CLI exits with code 0. This means the program did not
 	// encounter any errors
+	fmt.Println(out.String())
 	assert.Contains(t, out.String(), "OK         : false\n")
 }
 
