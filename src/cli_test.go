@@ -863,6 +863,40 @@ func TestCLI_ErrorOkExitsWithCodeZero(t *testing.T) {
 	assert.Contains(t, out.String(), "OK         : false\n")
 }
 
+func TestCLI_Retry(t *testing.T) {
+	// Create a sample markdown file
+	filePath := MakeMockMarkdownFile()
+
+	// Capture the output by using a bytes.Buffer
+	var out bytes.Buffer
+	w := tabwriter.NewWriter(&out, 0, 4, 4, ' ', 0)
+	defer w.Flush()
+
+	// Simulate executing -f and -e flags
+	args := os.Args[0:1] // Keep the program name only
+	args = append(
+		args,
+		"-f",
+		filePath,
+		"-t",
+		"200ms",
+		"--max-retries",
+		"2",
+		"--start-backoff",
+		"100ms",
+		"--max-backoff",
+		"200ms",
+	)
+	os.Args = args
+
+	CLI(w, "0.1.0-test", os.Exit)
+
+	// Verify that the CLI exits with code 0. This means the program did not
+	// encounter any errors
+	fmt.Println(out.String())
+	assert.Contains(t, out.String(), "Attempt    : 2\n\n")
+}
+
 // Benchmark for checkUrls
 func BenchmarkCheckUrls(b *testing.B) {
 	ts := httptest.NewServer(
