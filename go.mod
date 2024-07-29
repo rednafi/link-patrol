@@ -5,7 +5,7 @@ go 1.21.6
 require (
 	github.com/golangci/golangci-lint v1.59.1
 	github.com/stretchr/testify v1.9.0
-	github.com/urfave/cli/v2 v2.27.2 // app dep
+	github.com/urfave/cli/v2 v2.27.3 // app dep
 	github.com/yuin/goldmark v1.7.4 // app dep
 	honnef.co/go/tools v0.4.7 // indirect
 	mvdan.cc/gofumpt v0.6.0 // indirect
@@ -180,7 +180,7 @@ require (
 	github.com/uudashr/gocognit v1.1.2 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2 // indirect
 	github.com/xen0n/gosmopolitan v1.2.2 // indirect
-	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
+	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/yeya24/promlinter v0.3.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
