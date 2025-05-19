@@ -1,13 +1,14 @@
 module github.com/rednafi/link-patrol
 
-go 1.21.6
+go 1.23.0
+
 toolchain go1.24.1
 
 require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli/v2 v2.27.6 // app dep
-	github.com/yuin/goldmark v1.7.11 // app dep
+	github.com/yuin/goldmark v1.7.12 // app dep
 	honnef.co/go/tools v0.6.1 // indirect
 	mvdan.cc/gofumpt v0.7.0 // indirect
 )
