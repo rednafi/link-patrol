@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/golangci/golangci-lint v1.64.8
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7 // app dep
 	github.com/yuin/goldmark v1.7.13 // app dep
 	honnef.co/go/tools v0.6.1 // indirect
