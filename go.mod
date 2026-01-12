@@ -8,7 +8,7 @@ require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7 // app dep
-	github.com/yuin/goldmark v1.7.14 // app dep
+	github.com/yuin/goldmark v1.7.16 // app dep
 	honnef.co/go/tools v0.6.1 // indirect
 	mvdan.cc/gofumpt v0.7.0 // indirect
 )
